@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cronus — Clockify import</title>
+<style>
+  :root { color-scheme:light; --plane:#f9f9f7; --raised:#fff; --ink:#0b0b0b; --ink-2:#52514e;
+    --muted:#898781; --line:#e1e0d9; --ring:rgba(11,11,11,.10); --booked:#2a78d6; --crit:#d03b3b;
+    --good-text:#006300; --warn-text:#8a5c00; --wash:#f0efec; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--plane);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:840px;margin:0 auto;padding:28px 20px 80px}
+  h1{font-size:21px;margin:0 0 4px;letter-spacing:-.015em}
+  .sub{color:var(--ink-2);font-size:13.5px;margin:0 0 22px}
+  .card{background:var(--raised);border:1px solid var(--ring);border-radius:11px;padding:17px 18px;margin-bottom:14px}
+  .card h2{font-size:13px;margin:0 0 11px;letter-spacing:.02em;text-transform:uppercase;color:var(--muted)}
+  button{font:inherit;color:inherit;cursor:pointer}
+  .go{border:0;border-radius:9px;padding:11px 20px;font-weight:650;color:#fff;background:var(--booked)}
+  .go:disabled{background:#c3c2b7;cursor:not-allowed}
+  .danger{border:1px solid #f0c0c0;background:#fdf0f0;color:var(--crit);border-radius:9px;padding:10px 16px;font-weight:600}
+  .ghost{border:1px solid var(--line);background:var(--raised);border-radius:9px;padding:10px 16px;color:var(--ink-2)}
+  .drop{border:2px dashed var(--line);border-radius:11px;padding:26px;text-align:center;color:var(--ink-2);
+    background:var(--plane);cursor:pointer}
+  .drop.on{border-color:var(--booked);background:#eaf2fd;color:#184f95}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .fld{display:flex;flex-direction:column;gap:4px}
+  .fld label{font-size:11px;color:var(--muted);font-weight:650}
+  .fld input,.fld select{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;font-size:13.5px;background:var(--plane)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:0}
+  .log{font:12px/1.5 ui-monospace,Menlo,monospace;background:#0b0b0b;color:#e8e8e4;border-radius:9px;
+    padding:12px;max-height:280px;overflow:auto;white-space:pre-wrap}
+  .ok{color:var(--good-text);font-weight:650}
+  .warn{color:var(--warn-text);font-weight:650}
+  .bad{color:var(--crit);font-weight:650}
+  .note{font-size:12.5px;color:var(--muted)}
+  code{background:var(--wash);padding:1px 5px;border-radius:4px;font-size:12.5px}
+  .bar{height:8px;background:var(--wash);border-radius:4px;overflow:hidden;margin-top:8px}
+  .bar i{display:block;height:100%;background:var(--booked);width:0%}
+</style>
+</head>
+<body>
+<main>
+  <h1>Clockify → Cronus import</h1>
+  <p class="sub">Admin only. Reads a Clockify <b>Detailed report</b> CSV in your browser and loads it straight into Cronus — the file never leaves your machine except to your own database.</p>
+
+  <div class="card" id="cAuth">
+    <h2>1 · Sign in</h2>
+    <button class="go" id="signin">Continue with Google</button>
+    <p class="note" id="who" style="margin:10px 0 0"></p>
+  </div>
+
+  <div class="card" id="cFile" style="display:none">
+    <h2>2 · Drop the Clockify CSV</h2>
+    <div class="drop" id="drop">
+      Drop <b>Clockify_Time_Report_Detailed_….csv</b> here, or click to choose
+      <input type="file" id="file" accept=".csv" hidden>
+    </div>
+    <p class="note" id="fileInfo" style="margin:10px 0 0">Clockify → Reports → Detailed → Export → CSV. Include the whole period you want.</p>
+  </div>
+
+  <div class="card" id="cOpts" style="display:none">
+    <h2>3 · Choose what to load</h2>
+    <div class="row">
+      <div class="fld"><label>From</label><input type="date" id="from"></div>
+      <div class="fld"><label>To</label><input type="date" id="to"></div>
+      <div class="fld"><label>People</label><select id="who2">
+        <option value="pilot">Pilot group only</option>
+        <option value="all">Everyone in the file</option>
+      </select></div>
+      <div class="fld"><label>&nbsp;</label><button class="ghost" id="prep">Analyse</button></div>
+    </div>
+    <div id="prepOut" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card" id="cRun" style="display:none">
+    <h2>4 · Load and match</h2>
+    <p class="note" style="margin:0 0 11px">Imported rows are tagged <code>source='import'</code>, so the whole thing is reversible.</p>
+    <div class="row">
+      <button class="go" id="run">Import</button>
+      <button class="danger" id="revert">Remove imported rows in this range</button>
+    </div>
+    <div class="bar"><i id="prog"></i></div>
+    <div class="log" id="log" style="margin-top:12px;display:none"></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+const SB_URL="https://sxsjnxmbayjofqexoaxv.supabase.co", SB_KEY="sb_publishable_r1fAVjbu7nQsfGfKObLgnA_sNIjxO5E";
+const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,detectSessionInUrl:true}});
+const $=s=>document.querySelector(s);
+const PILOT=("adrian.tsui amber.wong cherie.hung giann.sun ivy.lai jennifer.ho kei.tang keith.tsui "+
+ "macy.sun nicole.lam nina.huang parry.li pearly.wu pete.wai ruby.ng sandy.wong spacey.ho "+
+ "summer.huang taiyo.chan vincent.wong willis.chao yan.cheng zoe.lau").split(/\s+/);
+const SEQ=['Pitching / Planning','Briefing Call','1st Shooting Plan','2nd Shooting Plan',
+ 'Nth Shooting Plan','Shooting','1st draft / Cut','2nd draft / Cut','Nth draft / Cut',
+ 'Preview','Launch','PM Report'];
+let RAW=null, PREP=null;
+
+function log(msg,cls){ const l=$('#log'); l.style.display='block';
+  l.innerHTML += (cls?'<span class="'+cls+'">'+msg+'</span>':msg)+'\n'; l.scrollTop=l.scrollHeight; }
+
+/* ---- auth ---- */
+$('#signin').onclick=async()=>{
+  const r=await sb.auth.signInWithOAuth({provider:'google',
+    options:{redirectTo:location.origin+location.pathname}});
+  if(r.error) alert(r.error.message);
+};
+(async function boot(){
+  const s=await sb.auth.getSession(); if(!s.data.session) return;
+  const b=await sb.rpc('bootstrap',{p_days:7});
+  if(b.error||!b.data||b.data.error){ $('#who').innerHTML='<span class="bad">Signed in, but Cronus refused: '+
+    ((b.data&&b.data.error)||b.error.message)+'</span>'; return; }
+  if(!b.data.me.is_admin){ $('#who').innerHTML='<span class="bad">'+b.data.me.name+
+    ' — this tool is admin only.</span>'; return; }
+  $('#who').innerHTML='<span class="ok">'+b.data.me.name+' · admin</span>';
+  $('#signin').style.display='none';
+  $('#cFile').style.display='';
+})();
+
+/* ---- CSV parsing (quoted fields, embedded commas and newlines) ---- */
+function parseCSV(text){
+  if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; }
+      else cur+=c;
+    } else if(c==='"') q=true;
+    else if(c===','){ row.push(cur); cur=''; }
+    else if(c==='\r'){ /* skip */ }
+    else if(c==='\n'){ row.push(cur); cur=''; rows.push(row); row=[]; }
+    else cur+=c;
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  const head=rows.shift().map(h=>h.trim());
+  return rows.filter(r=>r.length>1).map(r=>{
+    const o={}; head.forEach((h,i)=>o[h]=(r[i]===undefined?'':r[i])); return o; });
+}
+const mdy = s => { const p=String(s||'').split('/'); return p.length===3
+  ? p[2]+'-'+p[0].padStart(2,'0')+'-'+p[1].padStart(2,'0') : ''; };
+const localPart = e => String(e||'').split('@')[0].toLowerCase().trim();
+
+/* ---- file ---- */
+$('#drop').onclick=()=>$('#file').click();
+$('#drop').ondragover=e=>{e.preventDefault();$('#drop').classList.add('on');};
+$('#drop').ondragleave=()=>$('#drop').classList.remove('on');
+$('#drop').ondrop=e=>{e.preventDefault();$('#drop').classList.remove('on');
+  if(e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);};
+$('#file').onchange=e=>{ if(e.target.files[0]) readFile(e.target.files[0]); };
+function readFile(f){
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{ RAW=parseCSV(fr.result); }catch(err){ alert('Could not parse that file: '+err.message); return; }
+    const need=['Project','Task','Email','Start Date','Start Time','End Time','Duration (decimal)','Tags','Description'];
+    const missing=need.filter(k=>!(k in (RAW[0]||{})));
+    if(missing.length){ alert('That does not look like a Clockify Detailed export. Missing columns: '+missing.join(', ')); RAW=null; return; }
+    const ds=RAW.map(r=>mdy(r['Start Date'])).filter(Boolean).sort();
+    $('#fileInfo').innerHTML='<span class="ok">'+RAW.length.toLocaleString()+' rows</span> · '+
+      ds[0]+' → '+ds[ds.length-1]+' · '+new Set(RAW.map(r=>localPart(r.Email))).size+' people';
+    const today=new Date(); const to=ds[ds.length-1];
+    const d3=new Date(today.getTime()-92*864e5).toISOString().slice(0,10);
+    $('#from').value=d3>ds[0]?d3:ds[0];
+    $('#to').value= to>today.toISOString().slice(0,10) ? today.toISOString().slice(0,10) : to;
+    $('#cOpts').style.display=''; $('#cRun').style.display='none';
+  };
+  fr.readAsText(f);
+}
+
+/* ---- prepare payload ---- */
+function build(){
+  const from=$('#from').value, to=$('#to').value, pilotOnly=$('#who2').value==='pilot';
+  const rows=RAW.filter(r=>{
+    const d=mdy(r['Start Date']); if(!(d>=from&&d<=to)) return false;
+    if(pilotOnly && PILOT.indexOf(localPart(r.Email))<0) return false;
+    return !!localPart(r.Email);
+  });
+  const emails=[...new Set(rows.map(r=>localPart(r.Email)))].sort();
+  const eidx={}; emails.forEach((e,i)=>eidx[e]=i);
+  const pairKey=r=>r.Project+'\t'+r.Task;
+  const pairs=[...new Set(rows.map(pairKey))].sort();
+  const pidx={}; pairs.forEach((p,i)=>pidx[p]=i);
+  const lines=rows.map(r=>{
+    const mins=Math.round(parseFloat(r['Duration (decimal)']||'0')*60);
+    const tags=(r.Tags||'').split(',').map(t=>t.trim()).filter(Boolean);
+    let ord='';
+    if(tags.length){ const best=tags.slice().sort((a,b)=>
+        (SEQ.indexOf(a)<0?99:SEQ.indexOf(a))-(SEQ.indexOf(b)<0?99:SEQ.indexOf(b))).pop();
+      const i=SEQ.indexOf(best); if(i>=0) ord=String(i+1); }
+    const timed = mins<=1440;
+    return [ eidx[localPart(r.Email)], mdy(r['Start Date']),
+             timed?(r['Start Time']||''):'', timed?(r['End Time']||''):'',
+             mins, pidx[pairKey(r)], ord,
+             (r.Description||'').replace(/[|\r\n]/g,' ').trim().slice(0,120) ].join('|');
+  });
+  return {emails, pairs, lines, from, to, count:rows.length};
+}
+$('#prep').onclick=()=>{
+  if(!RAW) return;
+  PREP=build();
+  if(!PREP.count){ $('#prepOut').innerHTML='<span class="bad">Nothing matches that range and scope.</span>';
+    $('#cRun').style.display='none'; return; }
+  const over=PREP.lines.filter(l=>+l.split('|')[4]>1440).length;
+  const untag=PREP.lines.filter(l=>!l.split('|')[6]).length;
+  $('#prepOut').innerHTML='<table>'+
+    '<tr><td>Entries</td><td class="n"><b>'+PREP.count.toLocaleString()+'</b></td></tr>'+
+    '<tr><td>People</td><td class="n">'+PREP.emails.length+'</td></tr>'+
+    '<tr><td>Distinct project + deliverable pairs</td><td class="n">'+PREP.pairs.length+'</td></tr>'+
+    '<tr><td>Without a stage tag</td><td class="n">'+untag+' ('+Math.round(untag/PREP.count*100)+'%)</td></tr>'+
+    '<tr><td>Longer than 24 h (will be split)</td><td class="n">'+over+'</td></tr>'+
+    '</table><p class="note" style="margin:9px 0 0">Press Import to load and match against PACMAN. Nothing is written until you do.</p>';
+  $('#cRun').style.display='';
+};
+
+/* ---- run ---- */
+async function rpc(fn,args){ const r=await sb.rpc(fn,args);
+  if(r.error) throw new Error(fn+': '+(r.error.message||JSON.stringify(r.error))); return r.data; }
+
+$('#run').onclick=async()=>{
+  if(!PREP) return;
+  $('#run').disabled=true; $('#log').innerHTML=''; $('#prog').style.width='0%';
+  try{
+    log('Loading '+PREP.emails.length+' people…');
+    await rpc('imp_load_emails',{p:PREP.emails.join('\n')});
+    log('Loading '+PREP.pairs.length+' project/deliverable pairs…');
+    await rpc('imp_load_dict',{p:PREP.pairs.join('\n')});
+
+    const CH=400; let done=0;
+    for(let i=0;i<PREP.lines.length;i+=CH){
+      const chunk=PREP.lines.slice(i,i+CH);
+      await rpc('imp_load_rows',{p:chunk.join('\n'), p_reset:i===0});
+      done+=chunk.length;
+      $('#prog').style.width=Math.round(done/PREP.lines.length*70)+'%';
+      log('  staged '+done+' / '+PREP.lines.length);
+    }
+
+    log('Previewing the match…');
+    const pv=await rpc('imp_preview',{p_from:PREP.from,p_to:PREP.to});
+    log(JSON.stringify(pv,null,1));
+    if(pv.unknown_people>0) log('⚠ '+pv.unknown_people+' people in the file are not in Cronus and will be skipped: '+pv.unknown_who,'warn');
+
+    log('Importing…');
+    $('#prog').style.width='85%';
+    const res=await rpc('imp_run',{p_from:PREP.from,p_to:PREP.to});
+    $('#prog').style.width='100%';
+    log('Done.','ok');
+    log(JSON.stringify(res,null,1),'ok');
+    log('Open Cronus → Reports for '+PREP.from+' → '+PREP.to+' and compare the total against the same Clockify report.','ok');
+  }catch(e){ log('FAILED: '+e.message,'bad'); }
+  $('#run').disabled=false;
+};
+
+$('#revert').onclick=async()=>{
+  if(!PREP) return;
+  if(!confirmish()) return;
+  try{ const r=await rpc('imp_revert',{p_from:PREP.from,p_to:PREP.to});
+    log('Removed '+r.deleted+' imported entries in '+PREP.from+' → '+PREP.to,'warn'); }
+  catch(e){ log('FAILED: '+e.message,'bad'); }
+};
+function confirmish(){
+  const el=$('#revert');
+  if(el.dataset.armed==='1'){ el.dataset.armed='0'; el.textContent='Remove imported rows in this range'; return true; }
+  el.dataset.armed='1'; el.textContent='Click again to confirm removal';
+  setTimeout(()=>{ el.dataset.armed='0'; el.textContent='Remove imported rows in this range'; },4000);
+  return false;
+}
+</script>
+</body>
+</html>
