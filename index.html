@@ -12,16 +12,16 @@
     --line:#e1e0d9; --ring:rgba(11,11,11,0.10); --axis:#c3c2b7;
     --booked:#2a78d6; --unbooked:#eb6834;
     --good:#0ca30c; --crit:#d03b3b; --good-text:#006300; --warn-text:#8a5c00;
-    --wash:#f0efec; --r:10px;
+    --wash:#f0efec; --r:10px; --rail:206px;
   }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--plane); color:var(--ink);
-    font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; -webkit-text-size-adjust:100%; }
   button { font:inherit; color:inherit; cursor:pointer; }
   input, select { font:inherit; }
   code { font:12.5px ui-monospace,Menlo,monospace; background:var(--wash); padding:1px 5px; border-radius:4px; }
 
-  /* gate */
+  /* ---------- gate ---------- */
   .gate { min-height:100vh; display:grid; place-items:center; padding:24px; }
   .card { background:var(--raised); border:1px solid var(--ring); border-radius:14px;
     padding:34px 32px; max-width:430px; width:100%; box-shadow:0 2px 10px rgba(11,11,11,.05); }
@@ -33,24 +33,26 @@
   .mark { width:26px;height:26px;border-radius:7px;background:var(--booked);display:grid;place-items:center;
     color:#fff;font-size:13px;font-weight:700;margin-bottom:16px; }
 
-  /* shell */
-  .app { display:none; grid-template-columns:206px 1fr; min-height:100vh; }
+  /* ---------- shell ---------- */
+  .app { display:none; grid-template-columns:var(--rail) 1fr; min-height:100vh; }
   .app.on { display:grid; }
-  .rail { background:var(--surface); border-right:1px solid var(--line); padding:16px 0; display:flex; flex-direction:column; }
+  .rail { background:var(--surface); border-right:1px solid var(--line); padding:16px 0;
+    display:flex; flex-direction:column; }
   .brand { display:flex; align-items:center; gap:9px; padding:0 16px 16px; font-weight:650; }
   .brand .dot { width:22px;height:22px;border-radius:6px;background:var(--booked);
     display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700; }
+  .rail nav { display:flex; flex-direction:column; }
   .rail a { display:flex;align-items:center;gap:10px;padding:9px 16px;color:var(--ink-2);
-    text-decoration:none;font-size:14px;border-left:2px solid transparent; cursor:pointer; }
+    text-decoration:none;font-size:14px;border-left:2px solid transparent; cursor:pointer; white-space:nowrap; }
   .rail a.on { color:var(--ink); font-weight:600; background:var(--wash); border-left-color:var(--booked); }
   .rail a:hover:not(.on) { background:var(--wash); }
   .foot { margin-top:auto; padding:14px 16px 0; font-size:11.5px; color:var(--muted); line-height:1.5; }
   .foot button { border:0;background:none;padding:0;color:var(--booked);font-size:11.5px;text-decoration:underline; }
-  main { padding:22px 26px 70px; max-width:1180px; }
+  main { padding:22px 26px 70px; max-width:1240px; width:100%; }
   h1.hd { font-size:20px; margin:0 0 3px; letter-spacing:-.015em; }
   .sub { color:var(--ink-2); font-size:13.5px; margin:0 0 16px; }
 
-  /* entry bar */
+  /* ---------- entry bar ---------- */
   .entry { background:var(--raised); border:1px solid var(--ring); border-radius:var(--r); overflow:hidden;
     box-shadow:0 1px 2px rgba(11,11,11,.04); }
   .erow { display:flex; align-items:center; gap:8px; padding:10px 12px; flex-wrap:wrap; }
@@ -71,7 +73,7 @@
     font-size:13px; display:inline-flex; align-items:center; gap:6px; max-width:100%; }
   .chip.pick { border-style:dashed; color:var(--ink-2); }
   .chip.sel { background:#eaf2fd; border-color:#b7d3f6; color:#184f95; font-weight:600; border-style:solid;
-    max-width:340px; white-space:nowrap; overflow:hidden; }
+    max-width:330px; white-space:nowrap; overflow:hidden; }
   .chip.sel .tx { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .chip.stage { cursor:pointer; }
   .chip.stage.sug { background:var(--wash); border-style:dashed; color:var(--ink-2); }
@@ -79,15 +81,17 @@
   .chip.stage.miss { background:#fdf0f0; border-color:#f0c0c0; color:var(--crit); font-weight:600; }
   .chip.stage.opt { color:var(--muted); border-style:dashed; }
   .chip .x { opacity:.55; font-size:12px; }
-  .desc { flex:1 1 230px; min-width:160px; border:1px solid var(--line); border-radius:8px;
+  .desc { flex:1 1 200px; min-width:150px; border:1px solid var(--line); border-radius:8px;
     padding:9px 11px; background:var(--surface); }
   .desc:focus { outline:2px solid var(--booked); outline-offset:-1px; }
-  .durwrap { position:relative; }
-  .dur-in { width:104px; border:1px solid var(--line); border-radius:8px; padding:9px 11px; text-align:right;
-    font-variant-numeric:tabular-nums; font-weight:650; font-size:16px; background:var(--surface); }
-  .dur-in:focus { outline:2px solid var(--booked); outline-offset:-1px; }
-  .dur-in.bad { border-color:var(--crit); background:#fdf0f0; }
-  .durhint { position:absolute; left:0; top:100%; margin-top:4px; font-size:11px; color:var(--muted); white-space:nowrap; }
+  .times { display:inline-flex; align-items:center; gap:6px; }
+  .tin { width:104px; border:1px solid var(--line); border-radius:8px; padding:9px 10px;
+    font-variant-numeric:tabular-nums; font-weight:600; background:var(--surface); text-align:center; }
+  .tin:focus { outline:2px solid var(--booked); outline-offset:-1px; }
+  .tin.bad { border-color:var(--crit); background:#fdf0f0; }
+  .dash { color:var(--muted); }
+  .dur { font-variant-numeric:tabular-nums; font-weight:650; min-width:52px; font-size:15px; }
+  .dur.warn { color:var(--warn-text); }
   .add { border:0; border-radius:8px; padding:10px 20px; font-weight:650; color:#fff; background:var(--booked); }
   .add:disabled { background:var(--axis); cursor:not-allowed; }
   .kb { font-size:11.5px; color:var(--muted); padding:0 12px 10px; }
@@ -100,14 +104,14 @@
   .guard button { border:1px solid currentColor; background:transparent; border-radius:7px;
     padding:5px 11px; font-size:12.5px; font-weight:650; }
 
-  /* picker */
+  /* ---------- picker ---------- */
   .drawer { margin-top:10px; border:1px solid var(--ring); border-radius:var(--r); background:var(--raised); overflow:hidden; }
   .dhead { display:flex; gap:4px; padding:8px; border-bottom:1px solid var(--line); background:var(--surface);
     align-items:center; flex-wrap:wrap; }
   .dtab { border:0;background:transparent;padding:6px 11px;border-radius:7px;font-size:13.5px;color:var(--ink-2); }
   .dtab.on { background:var(--wash); color:var(--ink); font-weight:650; }
   .dsearch { margin-left:auto; border:1px solid var(--line); border-radius:7px; padding:6px 10px;
-    font-size:13.5px; width:236px; background:var(--raised); }
+    font-size:13.5px; width:220px; max-width:100%; background:var(--raised); }
   .rows { max-height:270px; overflow:auto; }
   .row { display:grid; grid-template-columns:auto 1fr auto; gap:11px; align-items:center; padding:10px 13px;
     border-bottom:1px solid var(--line); cursor:pointer; }
@@ -122,20 +126,32 @@
   .why.crew { background:#fdf1ea; color:#8a3b12; }
   .why.pm, .why.logged, .why.internal { background:var(--wash); color:var(--ink-2); }
   .empty { padding:18px 13px; color:var(--muted); font-size:13.5px; }
+  .addrow { display:flex; align-items:center; gap:9px; padding:11px 13px; border-top:1px solid var(--line);
+    background:var(--surface); cursor:pointer; font-size:13.5px; font-weight:600; color:var(--booked); }
+  .addrow:hover { background:var(--wash); }
+  .form { display:none; padding:13px; border-top:1px solid var(--line); background:var(--surface); }
+  .form.on { display:block; }
+  .fgrid { display:grid; grid-template-columns:minmax(180px,1fr) minmax(200px,2fr) auto; gap:8px; align-items:end; }
+  .fgrid label { font-size:11.5px; color:var(--muted); font-weight:650; display:block; margin-bottom:4px; }
+  .fgrid input, .fgrid select { width:100%; border:1px solid var(--line); border-radius:8px;
+    padding:9px 10px; font-size:13.5px; background:var(--raised); }
+  .mk { border:0;border-radius:8px;padding:10px 16px;font-weight:650;color:#fff;background:var(--booked); }
 
-  /* tiles + days */
-  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(172px,1fr)); gap:12px; margin:20px 0 0; }
+  /* ---------- tiles ---------- */
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin:20px 0 0; }
   .tile { background:var(--raised); border:1px solid var(--ring); border-radius:var(--r); padding:14px 15px; }
   .tlab { font-size:12px; color:var(--muted); font-weight:600; }
-  .tval { font-size:27px; font-weight:650; letter-spacing:-.025em; margin-top:5px; line-height:1.1;
+  .tval { font-size:26px; font-weight:650; letter-spacing:-.025em; margin-top:5px; line-height:1.1;
     font-variant-numeric:tabular-nums; }
   .tval small { font-size:14px; font-weight:500; color:var(--ink-2); }
   .tfoot { font-size:12.5px; color:var(--ink-2); margin-top:5px; }
   .meter { height:7px; border-radius:4px; background:var(--wash); margin-top:9px; overflow:hidden; }
   .meter i { display:block; height:100%; border-radius:4px; background:var(--booked); }
+
+  /* ---------- day list ---------- */
   .day { margin-top:20px; }
   .day.focus > .list { border-color:#b7d3f6; box-shadow:0 0 0 3px rgba(42,120,214,.10); }
-  .dayhead { display:flex; align-items:baseline; gap:9px; padding:0 2px 7px; }
+  .dayhead { display:flex; align-items:baseline; gap:9px; padding:0 2px 7px; flex-wrap:wrap; }
   .dayhead h2 { font-size:14px; margin:0; }
   .dayhead .tot { margin-left:auto; font-variant-numeric:tabular-nums; font-weight:650; }
   .here { font-size:11px; font-weight:700; color:#184f95; background:#eaf2fd; border:1px solid #b7d3f6;
@@ -143,7 +159,7 @@
   .over { font-size:11px; font-weight:700; color:var(--warn-text); background:#fdf6e3;
     border:1px solid #f6e4b0; border-radius:5px; padding:1px 6px; }
   .list { background:var(--raised); border:1px solid var(--ring); border-radius:var(--r); overflow:hidden; }
-  .e { display:grid; grid-template-columns:5px 1fr auto auto auto; gap:12px; align-items:center;
+  .e { display:grid; grid-template-columns:5px 1fr auto auto auto auto; gap:12px; align-items:center;
     padding:11px 13px; border-bottom:1px solid var(--line); }
   .e:last-child { border-bottom:0; }
   .e.pending { opacity:.55; }
@@ -152,6 +168,8 @@
   .e .t1 { font-size:14px; }
   .e .t1 .ph { color:var(--muted); }
   .e .t2 { font-size:12.5px; color:var(--muted); margin-top:2px; }
+  .when { font-size:13px; color:var(--ink-2); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .when.none { color:var(--muted); font-style:italic; }
   .e .d { font-variant-numeric:tabular-nums; font-weight:650; min-width:52px; text-align:right; }
   .ico { border:1px solid var(--line); background:var(--surface); border-radius:7px; width:30px;height:30px;
     display:grid;place-items:center; color:var(--ink-2); font-size:14px; }
@@ -161,7 +179,7 @@
   .tagchip.miss { color:var(--warn-text); background:#fdf6e3; border-color:#f6e4b0; font-weight:600; cursor:pointer; }
   .emptyday { padding:14px 13px; color:var(--muted); font-size:13.5px; }
   .sheet { border-bottom:1px solid var(--line); background:var(--surface); padding:13px; }
-  .sgrid { display:grid; grid-template-columns:106px 172px 1fr 1fr auto; gap:9px; align-items:end; }
+  .sgrid { display:grid; grid-template-columns:96px 96px 150px 1fr 1fr auto; gap:9px; align-items:end; }
   .sgrid label { font-size:11.5px; color:var(--muted); font-weight:650; display:block; margin-bottom:4px; }
   .sgrid input, .sgrid select { width:100%; border:1px solid var(--line); border-radius:8px; padding:9px 10px;
     font-size:13.5px; background:var(--raised); }
@@ -170,9 +188,48 @@
   .cn { border:1px solid var(--line);border-radius:8px;padding:9px 13px;background:var(--raised);color:var(--ink-2); }
   .del { border:1px solid #f0c0c0;border-radius:8px;padding:9px 13px;background:#fdf0f0;color:var(--crit);font-weight:600; }
 
-  /* week grid */
-  table { width:100%; border-collapse:collapse; background:var(--raised); }
-  .wrap { border:1px solid var(--ring); border-radius:var(--r); overflow:hidden; }
+  /* ---------- calendar ---------- */
+  .calbar { display:flex; gap:8px; align-items:center; margin-bottom:11px; flex-wrap:wrap; }
+  .calhint { font-size:12.5px; color:var(--muted); }
+  .calwrap { border:1px solid var(--ring); border-radius:var(--r); background:var(--raised); overflow:hidden; }
+  .calhead { display:grid; grid-template-columns:52px repeat(var(--cols),1fr); border-bottom:1px solid var(--line);
+    background:var(--surface); position:sticky; top:0; z-index:3; }
+  .calhead div { padding:7px 6px; text-align:center; font-size:12px; color:var(--ink-2); font-weight:600;
+    border-left:1px solid var(--line); }
+  .calhead div:first-child { border-left:0; }
+  .calhead .ct { display:block; font-size:11px; color:var(--muted); font-weight:500; font-variant-numeric:tabular-nums; }
+  .calhead .isnow { color:var(--booked); }
+  .unsched { display:flex; gap:6px; padding:7px 8px; border-bottom:1px solid var(--line);
+    background:#fdf6e3; flex-wrap:wrap; align-items:center; }
+  .unsched b { font-size:11.5px; color:var(--warn-text); }
+  .uchip { font-size:11.5px; border:1px solid #f6e4b0; background:var(--raised); border-radius:999px;
+    padding:3px 9px; cursor:pointer; }
+  .uchip:hover { background:var(--wash); }
+  .calscroll { max-height:64vh; overflow:auto; position:relative; }
+  .calgrid { display:grid; grid-template-columns:52px repeat(var(--cols),1fr); position:relative; padding-top:8px; }
+  .gutter { border-right:1px solid var(--line); }
+  .gutter div { height:var(--hh); font-size:11px; color:var(--muted); text-align:right; padding-right:6px;
+    transform:translateY(-6px); font-variant-numeric:tabular-nums; }
+  .daycol { position:relative; border-left:1px solid var(--line); touch-action:none; }
+  .daycol.wknd { background:#faf9f6; }
+  .daycol .hr { height:var(--hh); border-bottom:1px solid #f0efe9; }
+  .daycol .hr.half { border-bottom:1px dotted #f4f3ed; }
+  .blk { position:absolute; left:2px; right:2px; border-radius:6px; padding:3px 6px; overflow:hidden;
+    background:#eaf2fd; border:1px solid #b7d3f6; color:#12406f; cursor:grab; font-size:11.5px; line-height:1.25; }
+  .blk.ub { background:#fdf1ea; border-color:#f6d3bf; color:#8a3b12; }
+  .blk.pending { opacity:.55; }
+  .blk b { display:block; font-weight:650; font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .blk span { opacity:.85; font-variant-numeric:tabular-nums; }
+  .blk .rz { position:absolute; left:0; right:0; bottom:0; height:7px; cursor:ns-resize; }
+  .blk.drag { cursor:grabbing; box-shadow:0 4px 14px rgba(11,11,11,.18); z-index:5; }
+  .ghost { position:absolute; left:2px; right:2px; border-radius:6px; background:rgba(42,120,214,.18);
+    border:1px dashed var(--booked); pointer-events:none; z-index:4; font-size:11px; color:#12406f;
+    padding:2px 6px; font-variant-numeric:tabular-nums; }
+  .nowline { position:absolute; left:0; right:0; height:0; border-top:2px solid var(--crit); z-index:2; pointer-events:none; }
+
+  /* ---------- tables + chart ---------- */
+  .tblwrap { overflow-x:auto; border:1px solid var(--ring); border-radius:var(--r); }
+  table { width:100%; border-collapse:collapse; background:var(--raised); min-width:660px; }
   th,td { padding:10px 11px; border-bottom:1px solid var(--line); text-align:left; font-size:13.5px; }
   th { background:var(--surface); font-size:11.5px; letter-spacing:.05em; text-transform:uppercase;
     color:var(--muted); font-weight:650; }
@@ -186,20 +243,37 @@
   .cell:hover { border-color:var(--axis); background:var(--raised); }
   .cell:focus { outline:2px solid var(--booked); outline-offset:-1px; background:var(--raised); }
   .cell.has { font-weight:600; }
+  .cell:disabled { background:transparent; border-color:transparent; }
   .sat, .sun { background:#f6f5f1; }
-  .sat .cell, .sun .cell { background:transparent; }
   .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:11px; flex-wrap:wrap; }
   .rowlab { display:flex; align-items:center; gap:8px; }
+  .chart { background:var(--raised); border:1px solid var(--ring); border-radius:var(--r); padding:16px 18px; margin-top:14px; }
+  .legend { display:flex; gap:16px; font-size:12.5px; color:var(--ink-2); margin-bottom:12px; flex-wrap:wrap; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .sw { width:10px;height:10px;border-radius:3px;display:inline-block; }
+  .plot { position:relative; }
+  .bars { display:grid; grid-template-columns:repeat(7,1fr); gap:10px; align-items:end; height:150px; }
+  .col { display:flex; flex-direction:column; justify-content:flex-end; height:100%; gap:2px; }
+  .col .seg { border-radius:4px 4px 0 0; width:min(100%,80px); margin-inline:auto; }
+  .col .seg.b { background:var(--booked); }
+  .col .seg.u { background:var(--unbooked); border-radius:4px; }
+  .capline { position:absolute; left:0; right:0; border-top:1px dashed var(--axis); pointer-events:none; }
+  .capline b { position:absolute; right:0; top:-17px; font-size:11px; font-weight:600;
+    color:var(--muted); background:var(--raised); padding:0 4px; }
+  .xr { display:grid; grid-template-columns:repeat(7,1fr); gap:10px; margin-top:8px;
+    border-top:1px solid var(--axis); padding-top:7px; }
+  .xr div { font-size:11.5px; color:var(--muted); text-align:center; }
+  .vlab { font-size:11.5px; color:var(--ink-2); text-align:center; font-variant-numeric:tabular-nums; margin-bottom:4px; }
 
   .note { font-size:12.5px; color:var(--muted); margin-top:10px; }
   .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(16px);
     background:var(--ink); color:#fff; padding:10px 16px; border-radius:9px; font-size:13.5px;
-    opacity:0; transition:.22s; pointer-events:none; z-index:40; max-width:80vw; }
+    opacity:0; transition:.22s; pointer-events:none; z-index:60; max-width:88vw; text-align:center; }
   .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   .toast.err { background:var(--crit); }
-  .menu { position:absolute; z-index:30; background:var(--raised); border:1px solid var(--ring);
+  .menu { position:absolute; z-index:50; background:var(--raised); border:1px solid var(--ring);
     border-radius:10px; box-shadow:0 8px 26px rgba(11,11,11,.14); padding:6px; min-width:210px; display:none;
-    max-height:60vh; overflow:auto; }
+    max-height:56vh; overflow:auto; }
   .menu.on { display:block; }
   .menu button { display:flex; width:100%; align-items:center; gap:8px; border:0; background:transparent;
     text-align:left; padding:7px 9px; border-radius:7px; font-size:13.5px; }
@@ -208,14 +282,47 @@
     font-weight:650; padding:7px 9px 4px; }
   .menu .tick { color:var(--booked); font-weight:700; margin-left:auto; }
   .panel { display:none; } .panel.on { display:block; }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 900px) {
+    .app.on { grid-template-columns:1fr; }
+    .rail { flex-direction:row; align-items:center; gap:2px; padding:8px 10px; overflow-x:auto;
+      border-right:0; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20; }
+    .brand { padding:0 10px 0 4px; font-size:14px; }
+    .rail nav { flex-direction:row; gap:2px; }
+    .rail a { border-left:0; border-bottom:2px solid transparent; padding:7px 11px; border-radius:7px; }
+    .rail a.on { border-left-color:transparent; border-bottom-color:var(--booked); }
+    .foot { margin:0 0 0 auto; padding:0 4px 0 10px; text-align:right; white-space:nowrap; }
+    main { padding:16px 13px 60px; }
+    h1.hd { font-size:18px; }
+    .desc { flex-basis:100%; order:9; }
+    .chip.sel { max-width:100%; }
+    .dsearch { margin-left:0; width:100%; }
+    .sgrid { grid-template-columns:1fr 1fr; }
+    .sgrid .sbtns { grid-column:1 / -1; }
+    .fgrid { grid-template-columns:1fr; }
+    .tiles { grid-template-columns:repeat(2,1fr); }
+    .e { grid-template-columns:5px 1fr auto; row-gap:6px; }
+    .e .when, .e .tagchip { grid-column:2; justify-self:start; }
+    .e .d { grid-column:3; }
+    .e > span:last-child { grid-column:2 / -1; justify-self:end; }
+    .calscroll { max-height:none; }
+    .bars, .xr { gap:5px; }
+  }
+  @media (max-width: 560px) {
+    .tiles { grid-template-columns:1fr 1fr; }
+    .tin { width:84px; }
+    .brand span:last-child, .brand { font-size:0; padding-right:6px; }
+    .brand .dot { font-size:12px; }
+    .foot { font-size:11px; }
+  }
 </style>
 </head>
 <body>
 
-<!-- ================= GATE ================= -->
 <div class="gate" id="gate">
   <div class="card">
-    <div class="mark">PL</div>
+    <div class="mark">C</div>
     <h1 id="gTitle">Cronus</h1>
     <p id="gMsg">PressLogic time tracking. Sign in with your work Google account.</p>
     <button class="gbtn" id="signin">
@@ -226,48 +333,48 @@
   </div>
 </div>
 
-<!-- ================= APP ================= -->
 <div class="app" id="shell">
   <aside class="rail">
     <div class="brand"><span class="dot">C</span> Cronus</div>
     <nav>
-      <a class="on" data-go="log">✎ Log time</a>
-      <a data-go="week">▦ My week</a>
+      <a class="on" data-go="log">&#9998; Log time</a>
+      <a data-go="cal">&#128197; Calendar</a>
+      <a data-go="week">&#9638; My week</a>
     </nav>
-    <div class="foot">
-      <span id="whoami"></span><br>
-      <button id="signout">Sign out</button>
-    </div>
+    <div class="foot"><span id="whoami"></span><br><button id="signout">Sign out</button></div>
   </aside>
 
   <main>
-    <!-- LOG -->
+    <!-- ============ LOG ============ -->
     <section class="panel on" id="p-log">
-      <h1 class="hd" id="hello">Log time</h1>
+      <h1 class="hd">Log time</h1>
       <p class="sub" id="subline"></p>
 
       <div class="entry">
         <div class="erow top">
           <div class="stepper">
-            <button id="dPrev" title="Previous day">‹</button>
-            <span class="lab today" id="dLab">—</span>
-            <button id="dNext" title="Next day">›</button>
+            <button id="dPrev" title="Previous day">&lsaquo;</button>
+            <span class="lab today" id="dLab">&mdash;</span>
+            <button id="dNext" title="Next day">&rsaquo;</button>
           </div>
           <button class="quick" data-jump="0">Today</button>
           <button class="quick" data-jump="-1">Yesterday</button>
           <button class="quick" data-jump="fri">Last Friday</button>
         </div>
         <div class="erow">
-          <button class="chip pick" id="pickBtn">＋ Pick a deliverable</button>
+          <button class="chip pick" id="pickBtn">&#65291; Pick a deliverable</button>
           <button class="chip stage opt" id="stageBtn">Stage</button>
-          <input class="desc" id="desc" placeholder="Note (optional)">
-          <span class="durwrap">
-            <input class="dur-in" id="dur" placeholder="0:00" aria-label="Duration">
-            <span class="durhint" id="durHint">1.5 h · 90m · 8 = 8h · 45 = 45m</span>
+          <span class="times">
+            <input class="tin" id="tStart" placeholder="09:30" aria-label="Start time">
+            <span class="dash">&rarr;</span>
+            <input class="tin" id="tEnd" placeholder="11:00" aria-label="Finish time">
+            <span class="dur" id="durOut">&mdash;</span>
           </span>
+          <input class="desc" id="desc" placeholder="Note (optional)">
           <button class="add" id="addBtn" disabled>Add</button>
         </div>
-        <div class="kb"><kbd>←</kbd> <kbd>→</kbd> change day · <kbd>Enter</kbd> in the duration box saves</div>
+        <div class="kb">Finish accepts a time (<kbd>11:00</kbd>) or a length (<kbd>1.5</kbd>, <kbd>90m</kbd>) &middot;
+          <kbd>&larr;</kbd> <kbd>&rarr;</kbd> change day &middot; <kbd>Enter</kbd> saves</div>
         <div class="guard" id="guard"></div>
       </div>
 
@@ -276,9 +383,18 @@
           <button class="dtab on" data-d="mine">My deliverables <span class="why" style="margin-left:4px" id="mineN">0</span></button>
           <button class="dtab" data-d="recent">Recent</button>
           <button class="dtab" data-d="all">Search all bookings</button>
-          <input class="dsearch" id="dsearch" placeholder="Search brand, IO, format…">
+          <input class="dsearch" id="dsearch" placeholder="Filter your deliverables...">
         </div>
         <div class="rows" id="rows"></div>
+        <div class="addrow" id="addToggle">&#65291; Add something that isn&rsquo;t in PACMAN</div>
+        <div class="form" id="addForm">
+          <div class="fgrid">
+            <div><label>Attach to</label><select id="mTarget"></select></div>
+            <div><label>What is it?</label><input id="mName" placeholder="e.g. Q3 planning workshop" maxlength="120"></div>
+            <div><button class="mk" id="mMake">Create</button></div>
+          </div>
+          <p class="note" id="mNote" style="margin-bottom:0"></p>
+        </div>
       </div>
 
       <div class="tiles">
@@ -296,18 +412,40 @@
       <div id="days"></div>
     </section>
 
-    <!-- WEEK -->
+    <!-- ============ CALENDAR ============ -->
+    <section class="panel" id="p-cal">
+      <h1 class="hd">Calendar</h1>
+      <p class="sub">Drag on the grid to block out time. Drag a block to move it, or its bottom edge to resize.</p>
+      <div class="calbar">
+        <div class="stepper">
+          <button id="cPrev">&lsaquo;</button><span class="lab" id="cLab">&mdash;</span><button id="cNext">&rsaquo;</button>
+        </div>
+        <button class="quick" id="cToday">Today</button>
+        <span class="calhint" id="calSel">Pick a deliverable first &mdash; drag then fills it in.</span>
+      </div>
+      <div class="calwrap">
+        <div class="calhead" id="calHead"></div>
+        <div id="unsched"></div>
+        <div class="calscroll" id="calScroll">
+          <div class="calgrid" id="calGrid"></div>
+        </div>
+      </div>
+      <p class="note">Blocks are colour-coded: <b style="color:var(--booked)">booked PACMAN work</b> and
+        <b style="color:var(--unbooked)">unbooked or internal</b>. Anything logged without a time appears in the amber strip &mdash; click it to give it one.</p>
+    </section>
+
+    <!-- ============ WEEK ============ -->
     <section class="panel" id="p-week">
       <h1 class="hd">My week</h1>
-      <p class="sub">Type in any cell — it writes the same entries as the Log screen.</p>
+      <p class="sub">Type hours straight into the grid &mdash; fastest way to reconstruct a week.</p>
       <div class="toolbar">
         <div class="stepper">
-          <button id="wPrev">‹</button><span class="lab" id="wLab">—</span><button id="wNext">›</button>
+          <button id="wPrev">&lsaquo;</button><span class="lab" id="wLab">&mdash;</span><button id="wNext">&rsaquo;</button>
         </div>
-        <button class="quick" id="copyLast">⧉ Copy last week’s rows</button>
+        <button class="quick" id="copyLast">&#10683; Copy last week&rsquo;s rows</button>
         <span class="spacer"></span><span class="note" style="margin:0" id="wkSaved"></span>
       </div>
-      <div class="wrap">
+      <div class="tblwrap">
         <table>
           <thead><tr><th>Deliverable</th><th class="n">Mon</th><th class="n">Tue</th><th class="n">Wed</th>
             <th class="n">Thu</th><th class="n">Fri</th><th class="n sat">Sat</th><th class="n sun">Sun</th>
@@ -315,7 +453,17 @@
           <tbody id="wbody"></tbody><tfoot id="wfoot"></tfoot>
         </table>
       </div>
-      <p class="note">Enter <code>1.5</code>, <code>90m</code>, <code>1:30</code>, <code>8</code> (= 8h) or <code>45</code> (= 45m); blank a cell to delete it.</p>
+      <p class="note">Enter <code>1.5</code>, <code>90m</code>, <code>1:30</code>, <code>8</code> (= 8h) or <code>45</code> (= 45m); blank a cell to delete. Hours typed here carry no clock time &mdash; set one on the Calendar if you want it placed.</p>
+
+      <div class="chart">
+        <div class="legend">
+          <span><i class="sw" style="background:var(--booked)"></i> Booked PACMAN work</span>
+          <span><i class="sw" style="background:var(--unbooked)"></i> Unbooked / internal</span>
+          <span style="color:var(--muted)">&#9476; working day</span>
+        </div>
+        <div class="plot"><div class="bars" id="bars"></div><div class="capline" id="capline"><b></b></div></div>
+        <div class="xr" id="xr"></div>
+      </div>
     </section>
   </main>
 </div>
@@ -333,518 +481,780 @@ const $$ = s => [...document.querySelectorAll(s)];
 const pad = n => String(n).padStart(2,'0');
 const hm  = m => Math.floor(m/60)+':'+pad(Math.round(m%60));
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const toD = s => { const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); };
-const toS = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const toD = s => { const p=s.split('-').map(Number); return new Date(p[0],p[1]-1,p[2]); };
+const toS = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const shift = (s,n) => { const d=toD(s); d.setDate(d.getDate()+n); return toS(d); };
-const fmt = s => { const d=toD(s); return `${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}`; };
+const fmt = s => { const d=toD(s); return DOW[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()]; };
 const monday = s => { const d=toD(s); d.setDate(d.getDate()-((d.getDay()+6)%7)); return toS(d); };
 const weekDays = m => Array.from({length:7},(_,i)=>shift(m,i));
 const PAGE_COL = { GS:'#2a78d6', HS:'#eb6834', MD:'#1baf7a', BF:'#4a3aa7', TB:'#e87ba4',
                    BK:'#eda100', UL:'#008300', PC:'#e34948' };
+const DAY_START = 6*60, DAY_END = 23*60, HH = 46, SNAP = 15;   // grid 06:00–23:00
+const isNarrow = () => matchMedia('(max-width: 900px)').matches;
 
-let S = null;                 // bootstrap payload
-let TASK = {};                // task_id -> deliverable
-let ENTRIES = [];             // local mirror
-let selDate, selTask=null, selStage=null, weekMon, openEdit=null, dTab='mine', pendingBig=null;
-let searchRows = [], searchTimer = null, tmpSeq = 0;
+let S=null, TASK={}, ENTRIES=[];
+let selDate, selTask=null, selStage=null, weekMon, calMon, openEdit=null, dTab='mine', pendingBig=null;
+let searchRows=[], searchTimer=null, tmpSeq=0, drag=null;
 
-function toast(msg, bad){ const t=$('#toast'); t.textContent=msg; t.className='toast show'+(bad?' err':'');
-  clearTimeout(t._x); t._x=setTimeout(()=>t.className='toast',2600); }
+function toast(msg,bad){ const t=$('#toast'); t.textContent=msg; t.className='toast show'+(bad?' err':'');
+  clearTimeout(t._x); t._x=setTimeout(function(){ t.className='toast'; },2800); }
 
-/* ---------- duration parsing ---------- */
+/* ---------- time helpers ---------- */
 function parseDur(raw){
-  const s = String(raw||'').trim().toLowerCase().replace(',', '.');
-  if (!s) return null;
-  let m;
-  if ((m = s.match(/^(\d+):([0-5]?\d)$/)))            return +m[1]*60 + +m[2];
-  if ((m = s.match(/^(\d+)\s*h\s*([0-5]?\d)\s*m?$/))) return +m[1]*60 + +m[2];
-  if ((m = s.match(/^(\d+(?:\.\d+)?)\s*h$/)))         return Math.round(+m[1]*60);
-  if ((m = s.match(/^(\d+)\s*m(?:in)?$/)))            return +m[1];
-  if (/^\d*\.\d+$/.test(s))                           return Math.round(parseFloat(s)*60);
-  if ((m = s.match(/^(\d+)$/)))                       return +m[1] <= 12 ? +m[1]*60 : +m[1];
+  const s=String(raw||'').trim().toLowerCase().replace(',','.'); if(!s) return null; let m;
+  if((m=s.match(/^(\d+)\s*h\s*([0-5]?\d)\s*m?$/))) return +m[1]*60 + +m[2];
+  if((m=s.match(/^(\d+(?:\.\d+)?)\s*h$/)))         return Math.round(+m[1]*60);
+  if((m=s.match(/^(\d+)\s*m(?:in)?$/)))            return +m[1];
+  if(/^\d*\.\d+$/.test(s))                         return Math.round(parseFloat(s)*60);
+  if((m=s.match(/^(\d+)$/)))                       return +m[1]<=12 ? +m[1]*60 : +m[1];
   return null;
 }
+// "9", "930", "9:30", "0930", "9.30", "9am", "5pm" -> minutes from midnight
+function parseTime(raw){
+  let s=String(raw||'').trim().toLowerCase().replace(/\s/g,''); if(!s) return null;
+  let ap=null;
+  if(/(am|pm)$/.test(s)){ ap=s.slice(-2); s=s.slice(0,-2); }
+  s=s.replace('.',':');
+  let h,mi,m;
+  if((m=s.match(/^(\d{1,2}):([0-5]\d)$/))){ h=+m[1]; mi=+m[2]; }
+  else if((m=s.match(/^(\d{1,2})$/))){ h=+m[1]; mi=0; }
+  else if((m=s.match(/^(\d{3,4})$/))){ const v=m[1]; h=+v.slice(0,v.length-2); mi=+v.slice(-2); }
+  else return null;
+  if(ap==='pm' && h<12) h+=12;
+  if(ap==='am' && h===12) h=0;
+  if(h>23||mi>59) return null;
+  return h*60+mi;
+}
+const t2s = t => t==null ? '' : pad(Math.floor(t/60))+':'+pad(t%60);
+const snap = t => Math.round(t/SNAP)*SNAP;
+const startMins = e => e.start ? parseTime(e.start) : null;
 
 /* ---------- auth ---------- */
-$('#signin').onclick = async () => {
-  const { error } = await sb.auth.signInWithOAuth({
-    provider:'google',
-    options:{ redirectTo: location.origin + location.pathname, queryParams:{ prompt:'select_account' } }
-  });
-  if (error) toast(error.message, true);
+$('#signin').onclick = async function(){
+  const r = await sb.auth.signInWithOAuth({ provider:'google',
+    options:{ redirectTo: location.origin+location.pathname, queryParams:{ prompt:'select_account' } } });
+  if(r.error) toast(r.error.message,true);
 };
-$('#signout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
-
-function gateMsg(title, msg, note){
-  $('#gTitle').textContent = title; $('#gMsg').textContent = msg;
-  $('#gNote').textContent = note || ''; $('#signin').style.display = 'none';
-}
+$('#signout').onclick = async function(){ await sb.auth.signOut(); location.reload(); };
+function gateMsg(t,m,n){ $('#gTitle').textContent=t; $('#gMsg').textContent=m;
+  $('#gNote').textContent=n||''; $('#signin').style.display='none'; }
 
 async function start(){
-  const { data:{ session } } = await sb.auth.getSession();
-  if (!session) return;                                   // show sign-in
-  const { data, error } = await sb.rpc('bootstrap', { p_days: 60 });
-  if (error){ gateMsg('Cronus could not start', error.message, 'Tell Parry what this says.'); return; }
-  if (data && data.error){
-    const who = data.email ? ` (${data.email})` : '';
-    if (data.error==='no_account')
-      gateMsg('No account yet', 'That Google address isn’t linked to a person in the tracker'+who+'.',
-              'Every alias domain should resolve automatically, so this usually means the address is missing from the roster. Ask Parry to add it.');
-    else if (data.error==='not_in_pilot')
-      gateMsg('Not in the pilot yet', 'Your account exists'+who+', but the tracker is limited to the pilot group for now.',
-              'You’re still logging time in Clockify until the rollout reaches you.');
-    else if (data.error==='inactive')
-      gateMsg('Account inactive', 'This account'+who+' is marked inactive.', '');
-    else gateMsg('Cannot start', String(data.error), '');
+  const s = await sb.auth.getSession(); if(!s.data.session) return;
+  const r = await sb.rpc('bootstrap',{p_days:60});
+  if(r.error){ gateMsg('Cronus could not start', r.error.message,'Send this to Parry.'); return; }
+  const d=r.data;
+  if(d && d.error){
+    const who = d.email ? ' ('+d.email+')' : '';
+    if(d.error==='no_account') gateMsg('No account yet','That Google address is not linked to a person in Cronus'+who+'.','Alias domains normally resolve automatically, so this usually means the address is missing from the staff roster. Ask Parry to add it.');
+    else if(d.error==='not_in_pilot') gateMsg('Not in the pilot yet','Your account exists'+who+', but Cronus is limited to the pilot group for now.','Keep logging in Clockify until the rollout reaches you.');
+    else if(d.error==='inactive') gateMsg('Account inactive','This account'+who+' is marked inactive.','');
+    else gateMsg('Cannot start',String(d.error),'');
     return;
   }
-  S = data;
-  S.deliverables.forEach(d => TASK[d.task_id] = d);
-  ENTRIES = S.entries.map(e => ({ ...e, mins:+e.mins }));
-  selDate = S.today; weekMon = monday(S.today);
+  S=d;
+  S.deliverables.forEach(function(x){ TASK[x.task_id]=x; });
+  ENTRIES = S.entries.map(function(e){ e.mins=+e.mins; return e; });
+  selDate=S.today; weekMon=monday(S.today); calMon=monday(S.today);
   $('#gate').style.display='none'; $('#shell').classList.add('on');
-  $('#whoami').textContent = S.me.name + ' · ' + S.me.role.replace('_',' ');
-  $('#hello').textContent = 'Log time';
+  $('#whoami').textContent = S.me.name+' · '+S.me.role.replace('_',' ');
+  buildTargets();
   renderAll();
 }
 
-/* ---------- stage helpers ---------- */
-const stageById = id => (S.stages.find(s=>s.id===id) || null);
-const stageName = id => { const s = stageById(id); return s ? s.name : null; };
-const suggestFor = t => t ? (t.suggest || null) : null;
-const effStage = () => selStage !== null ? selStage : (selTask ? suggestFor(TASK[selTask]) : null);
+/* ---------- stages ---------- */
+const stageById = id => (S.stages.filter(function(s){return s.id===id;})[0]||null);
+const stageName = id => { const s=stageById(id); return s?s.name:null; };
+const effStage = () => selStage!==null ? selStage : (selTask&&TASK[selTask] ? (TASK[selTask].suggest||null) : null);
 const stageRequired = () => selTask && TASK[selTask] && TASK[selTask].booked;
 
-function openStageMenu(anchor, current, onPick){
-  const m = $('#menu');
-  const seq = S.stages.filter(s=>s.kind==='sequence'), oth = S.stages.filter(s=>s.kind!=='sequence');
-  const sug = selTask ? suggestFor(TASK[selTask]) : null;
-  const row = s => `<button data-s="${s.id}">${esc(s.name)}`+
+function openStageMenu(anchor,current,onPick){
+  const m=$('#menu');
+  const seq=S.stages.filter(function(s){return s.kind==='sequence';});
+  const oth=S.stages.filter(function(s){return s.kind!=='sequence';});
+  const sug=selTask&&TASK[selTask]?TASK[selTask].suggest:null;
+  const row=function(s){ return '<button data-s="'+s.id+'">'+esc(s.name)+
     (s.id===sug?' <span class="x" style="color:var(--muted);font-size:11px">suggested</span>':'')+
-    (s.id===current?'<span class="tick">✓</span>':'')+`</button>`;
-  m.innerHTML = `<div class="hd">Production sequence</div>${seq.map(row).join('')}`+
-                (oth.length?`<div class="hd">Other</div>${oth.map(row).join('')}`:'');
-  const r = anchor.getBoundingClientRect();
-  m.classList.add('on');
-  m.style.left = Math.min(r.left, innerWidth - m.offsetWidth - 14) + 'px';
-  m.style.top  = (r.bottom + scrollY + 6) + 'px';
-  m.querySelectorAll('button').forEach(b => b.onclick = ev => {
-    ev.stopPropagation(); m.classList.remove('on'); onPick(b.dataset.s);
-  });
+    (s.id===current?'<span class="tick">&#10003;</span>':'')+'</button>'; };
+  m.innerHTML='<div class="hd">Production sequence</div>'+seq.map(row).join('')+
+    (oth.length?'<div class="hd">Other</div>'+oth.map(row).join(''):'');
+  const r=anchor.getBoundingClientRect(); m.classList.add('on');
+  m.style.left=Math.max(8,Math.min(r.left, innerWidth-m.offsetWidth-14))+'px';
+  m.style.top=(r.bottom+scrollY+6)+'px';
+  m.querySelectorAll('button').forEach(function(b){ b.onclick=function(ev){
+    ev.stopPropagation(); m.classList.remove('on'); onPick(b.dataset.s); }; });
 }
-document.addEventListener('click', e => {
-  if (!e.target.closest('#menu') && !e.target.closest('.chip.stage') && !e.target.closest('.tagchip.miss'))
+document.addEventListener('click',function(e){
+  if(!e.target.closest('#menu')&&!e.target.closest('.chip.stage')&&!e.target.closest('.tagchip.miss'))
     $('#menu').classList.remove('on');
 });
 
 /* ---------- entry bar ---------- */
-function lastFriday(){ let d = shift(S.today,-1); while (toD(d).getDay()!==5) d = shift(d,-1); return d; }
-
+function lastFriday(){ let d=shift(S.today,-1); while(toD(d).getDay()!==5) d=shift(d,-1); return d; }
+function nextFreeStart(date){
+  const ends = ENTRIES.filter(function(e){ return e.date===date && e.end; })
+                      .map(function(e){ return parseTime(e.end); });
+  return ends.length ? Math.min(Math.max.apply(null,ends), DAY_END-60) : 9*60+30;
+}
+function currentTimes(){
+  const a=parseTime($('#tStart').value);
+  let b=parseTime($('#tEnd').value);
+  if(b===null && a!==null){ const dur=parseDur($('#tEnd').value); if(dur) b=a+dur; }
+  return {a:a,b:b};
+}
 function paintBar(){
-  const lab = $('#dLab');
-  lab.textContent = (selDate===S.today?'Today · ':selDate===shift(S.today,-1)?'Yesterday · ':'') + fmt(selDate);
-  lab.classList.toggle('today', selDate===S.today);
-  $$('.quick[data-jump]').forEach(b=>{
-    const t = b.dataset.jump==='fri' ? lastFriday() : shift(S.today, +b.dataset.jump);
-    b.classList.toggle('on', t===selDate);
-  });
-  const p = $('#pickBtn'), t = selTask ? TASK[selTask] : null;
-  if (t){ p.className='chip pick sel'; p.title=t.name;
-    p.innerHTML = `<span class="tx">${esc(t.name)}</span> <span class="x">✕</span>`; }
+  const lab=$('#dLab');
+  lab.textContent=(selDate===S.today?'Today · ':selDate===shift(S.today,-1)?'Yesterday · ':'')+fmt(selDate);
+  lab.classList.toggle('today',selDate===S.today);
+  $$('.quick[data-jump]').forEach(function(b){
+    const t=b.dataset.jump==='fri'?lastFriday():shift(S.today,+b.dataset.jump);
+    b.classList.toggle('on',t===selDate); });
+
+  const p=$('#pickBtn'), t=selTask?TASK[selTask]:null;
+  if(t){ p.className='chip pick sel'; p.title=t.name;
+    p.innerHTML='<span class="tx">'+esc(t.name)+'</span> <span class="x">&#10005;</span>'; }
   else { p.className='chip pick'; p.textContent='＋ Pick a deliverable'; }
 
-  const st = $('#stageBtn'), sid = effStage(), sn = stageName(sid);
+  const st=$('#stageBtn'), sid=effStage(), sn=stageName(sid);
   st.className='chip stage';
-  if (!selTask)                 { st.classList.add('opt');  st.textContent='Stage'; }
-  else if (!stageRequired())    { st.classList.add(sn?'set':'opt'); st.textContent = sn || 'Stage (optional)'; }
-  else if (!sn)                 { st.classList.add('miss'); st.textContent='Stage required'; }
-  else if (selStage===null)     { st.classList.add('sug');  st.innerHTML = esc(sn)+' <span class="x">suggested</span>'; }
-  else                          { st.classList.add('set');  st.textContent = sn; }
+  if(!selTask){ st.classList.add('opt'); st.textContent='Stage'; }
+  else if(!stageRequired()){ st.classList.add(sn?'set':'opt'); st.textContent=sn||'Stage (optional)'; }
+  else if(!sn){ st.classList.add('miss'); st.textContent='Stage required'; }
+  else if(selStage===null){ st.classList.add('sug'); st.innerHTML=esc(sn)+' <span class="x">suggested</span>'; }
+  else { st.classList.add('set'); st.textContent=sn; }
 
-  const mins = parseDur($('#dur').value);
-  $('#dur').classList.toggle('bad', $('#dur').value.trim()!=='' && mins===null);
-  $('#addBtn').disabled = !(selTask && mins>0 && !(stageRequired() && !sid));
-  $('#durHint').textContent = mins>0 ? '= '+hm(mins) : '1.5 h · 90m · 8 = 8h · 45 = 45m';
+  const tt=currentTimes();
+  $('#tStart').classList.toggle('bad', $('#tStart').value.trim()!=='' && tt.a===null);
+  $('#tEnd').classList.toggle('bad', $('#tEnd').value.trim()!=='' && tt.b===null);
+  const mins = (tt.a!==null&&tt.b!==null) ? tt.b-tt.a : null;
+  const out=$('#durOut');
+  out.className='dur'+(mins!==null&&mins>720?' warn':'');
+  out.textContent = mins===null ? '—' : (mins<=0 ? 'ends before it starts' : hm(mins));
+  $('#addBtn').disabled = !(selTask && mins>0 && !(stageRequired()&&!sid));
+  $('#calSel').textContent = selTask ? ('Dragging will log: '+TASK[selTask].name) : 'Pick a deliverable first — drag then fills it in.';
   paintGuard(mins);
 }
 function paintGuard(mins){
-  const g = $('#guard'); g.className='guard'; g.innerHTML='';
-  if (pendingBig){
+  const g=$('#guard'); g.className='guard'; g.innerHTML='';
+  if(pendingBig){
     g.className='guard on hard';
-    g.innerHTML = `<span>⚠ <b>${hm(pendingBig.mins)}</b> in one entry on ${fmt(pendingBig.date)} — over 16 hours.</span>
-      <button id="gYes">Save it anyway</button><button id="gNo">Let me fix it</button>`;
-    $('#gYes').onclick = () => { const p=pendingBig; pendingBig=null; commit(p.mins); };
-    $('#gNo').onclick  = () => { pendingBig=null; paintBar(); $('#dur').focus(); };
+    g.innerHTML='<span>&#9888; <b>'+hm(pendingBig.mins)+'</b> in one entry on '+fmt(pendingBig.date)+' &mdash; over 16 hours.</span>'+
+      '<button id="gYes">Save it anyway</button><button id="gNo">Let me fix it</button>';
+    $('#gYes').onclick=function(){ const p=pendingBig; pendingBig=null; commit(p); };
+    $('#gNo').onclick=function(){ pendingBig=null; paintBar(); $('#tEnd').focus(); };
     return;
   }
-  const day = totalFor(selDate) + (mins>0?mins:0);
-  if (mins > 720){ g.className='guard on';
-    g.innerHTML = `<span>That’s <b>${hm(mins)}</b> in a single entry — just confirming the day is right. It will save.</span>`; }
-  else if (day > 720){ g.className='guard on';
-    g.innerHTML = `<span><b>${fmt(selDate)}</b> would reach <b>${hm(day)}</b>. Still saves.</span>`; }
+  if(mins===null) return;
+  const day=totalFor(selDate)+(mins>0?mins:0);
+  if(mins>720){ g.className='guard on';
+    g.innerHTML='<span>That is <b>'+hm(mins)+'</b> in a single entry &mdash; just confirming the day is right. It will save.</span>'; }
+  else if(day>720){ g.className='guard on';
+    g.innerHTML='<span><b>'+fmt(selDate)+'</b> would reach <b>'+hm(day)+'</b>. Still saves.</span>'; }
+}
+function resetTimes(){
+  const a=nextFreeStart(selDate);
+  $('#tStart').value=t2s(a); $('#tEnd').value=t2s(Math.min(a+60,DAY_END));
 }
 
 /* ---------- picker ---------- */
-const lastUsed = id => ENTRIES.filter(e=>e.task_id===id).map(e=>e.date).sort().pop();
-function recentTasks(){
-  const seen=[]; [...ENTRIES].sort((a,b)=>a.date<b.date?1:-1).forEach(e=>{ if(!seen.includes(e.task_id)) seen.push(e.task_id); });
-  return seen.filter(id=>TASK[id]).slice(0,8);
-}
-function roleLabel(d){
-  const r = (d.roles||[])[0] || '';
-  return { editor_pic:'Editor PIC', crew:'Crew', pm:'Assigned PM', internal:'Internal', logged:'Logged before' }[r] || r;
-}
+const lastUsed = id => ENTRIES.filter(function(e){return e.task_id===id;}).map(function(e){return e.date;}).sort().pop();
+function recentTasks(){ const seen=[];
+  ENTRIES.slice().sort(function(a,b){return a.date<b.date?1:-1;})
+    .forEach(function(e){ if(seen.indexOf(e.task_id)<0) seen.push(e.task_id); });
+  return seen.filter(function(id){return TASK[id];}).slice(0,8); }
+function roleLabel(d){ const r=(d.roles||[])[0]||'';
+  return {editor_pic:'Editor PIC',crew:'Crew',pm:'Assigned PM',internal:'Internal',logged:'Logged before'}[r]||r; }
+const relDay = d => !d?'':d===S.today?'today':d===shift(S.today,-1)?'yesterday':fmt(d);
+
 function renderRows(){
-  const q = $('#dsearch').value.trim();
-  let set;
-  if (dTab==='all'){
-    if (q.length < 2){ $('#rows').innerHTML = `<div class="empty">Type at least two characters to search all 6,362 deliverables.</div>`; return; }
-    set = searchRows.map(r => ({ task_id:r.task_id, project_id:r.project_id, name:r.deliverable,
-      client:r.client, io:r.io_number, page:r.page_abbr, booked:r.booked, roles:[], _remote:true,
-      why:r.booking_status || 'PACMAN' }));
+  const q=$('#dsearch').value.trim(); let set;
+  if(dTab==='all'){
+    if(q.length<2){ $('#rows').innerHTML='<div class="empty">Type at least two characters to search every deliverable in PACMAN.</div>'; return; }
+    set=searchRows.map(function(r){ return {task_id:r.task_id,project_id:r.project_id,name:r.deliverable,
+      client:r.client,io:r.io_number,page:r.page_abbr,booked:r.booked,roles:[],_remote:true,
+      why:r.booking_status||'PACMAN'}; });
   } else {
-    const base = dTab==='mine' ? S.deliverables.filter(d=>d.live)
-                               : recentTasks().map(id=>TASK[id]);
-    set = q ? base.filter(d => (d.name+' '+(d.client||'')+' '+(d.io||'')).toLowerCase().includes(q.toLowerCase())) : base;
+    const base = dTab==='mine' ? S.deliverables.filter(function(d){return d.live;})
+                               : recentTasks().map(function(id){return TASK[id];});
+    set = q ? base.filter(function(d){ return (d.name+' '+(d.client||'')+' '+(d.io||'')).toLowerCase().indexOf(q.toLowerCase())>=0; }) : base;
   }
-  if (!set.length){ $('#rows').innerHTML = `<div class="empty">Nothing here${q?` for “${esc(q)}”`:''}. Try “Search all bookings”.</div>`; return; }
-  $('#rows').innerHTML = set.slice(0,60).map(d=>{
-    const col = PAGE_COL[d.page] || '#c3c2b7';
-    const why = d._remote ? d.why : (dTab==='recent' ? relDay(lastUsed(d.task_id)) : roleLabel(d));
-    const cls = d._remote ? 'pm' : ((d.roles||[])[0] || 'pm');
-    return `<div class="row ${d.task_id===selTask?'cur':''}" data-id="${d.task_id}">
-      <span class="pg" style="background:${col}">${esc(d.page||'—')}</span>
-      <div><div class="r1">${esc(d.name)}</div>
-        <div class="r2">${esc(d.client||'internal')}${d.io?' · '+esc(d.io):''}${d.booked?'':' · <b style="color:var(--unbooked)">unbooked</b>'}</div></div>
-      <span class="why ${cls}">${esc(why)}</span></div>`;
+  if(!set.length){ $('#rows').innerHTML='<div class="empty">Nothing here'+(q?' for &ldquo;'+esc(q)+'&rdquo;':'')+'. Try &ldquo;Search all bookings&rdquo;, or add a manual item below.</div>'; return; }
+  $('#rows').innerHTML=set.slice(0,60).map(function(d){
+    const col=PAGE_COL[d.page]||'#c3c2b7';
+    const why=d._remote?d.why:(dTab==='recent'?relDay(lastUsed(d.task_id)):roleLabel(d));
+    const cls=d._remote?'pm':((d.roles||[])[0]||'pm');
+    return '<div class="row '+(d.task_id===selTask?'cur':'')+'" data-id="'+d.task_id+'">'+
+      '<span class="pg" style="background:'+col+'">'+esc(d.page||'&mdash;')+'</span>'+
+      '<div><div class="r1">'+esc(d.name)+'</div><div class="r2">'+esc(d.client||'internal')+
+      (d.io?' · '+esc(d.io):'')+(d.booked?'':' · <b style="color:var(--unbooked)">unbooked</b>')+'</div></div>'+
+      '<span class="why '+cls+'">'+esc(why)+'</span></div>';
   }).join('');
-  $$('#rows .row').forEach(el => el.onclick = () => {
-    const id = el.dataset.id;
-    if (!TASK[id]){ const f = set.find(x=>x.task_id===id); TASK[id] = { ...f, suggest:null }; }
-    selTask = id; selStage = null;
-    if (!TASK[id].suggest && TASK[id].booked) fetchSuggest(id);
-    renderRows(); paintBar(); $('#dur').focus();
-  });
+  $$('#rows .row').forEach(function(el){ el.onclick=function(){
+    const id=el.dataset.id;
+    if(!TASK[id]){ const f=set.filter(function(x){return x.task_id===id;})[0]; TASK[id]=f; TASK[id].suggest=null; }
+    selTask=id; selStage=null;
+    if(!TASK[id].suggest && TASK[id].booked) fetchSuggest(id);
+    renderRows(); paintBar(); $('#tEnd').focus();
+  }; });
 }
-const relDay = d => !d ? '' : d===S.today ? 'today' : d===shift(S.today,-1) ? 'yesterday' : fmt(d);
-async function fetchSuggest(id){
-  const { data } = await sb.rpc('suggest_stage', { p_task:id });
-  if (data){ TASK[id].suggest = data; if (selTask===id && selStage===null) paintBar(); }
-}
-$('#dsearch').oninput = () => {
-  if (dTab!=='all'){ renderRows(); return; }
+async function fetchSuggest(id){ const r=await sb.rpc('suggest_stage',{p_task:id});
+  if(r.data){ TASK[id].suggest=r.data; if(selTask===id&&selStage===null) paintBar(); } }
+$('#dsearch').oninput=function(){
+  if(dTab!=='all'){ renderRows(); return; }
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(async () => {
-    const q = $('#dsearch').value.trim();
-    if (q.length < 2) return renderRows();
-    const { data, error } = await sb.rpc('search_tasks', { q, lim:40 });
-    if (error){ toast(error.message, true); return; }
-    searchRows = data || []; renderRows();
-  }, 160);
+  searchTimer=setTimeout(async function(){
+    const q=$('#dsearch').value.trim(); if(q.length<2) return renderRows();
+    const r=await sb.rpc('search_tasks',{q:q,lim:40});
+    if(r.error){ toast(r.error.message,true); return; }
+    searchRows=r.data||[]; renderRows();
+  },160);
+};
+
+/* ---------- manual items ---------- */
+function buildTargets(){
+  const t=S.targets||[];
+  $('#mTarget').innerHTML=t.map(function(x){
+    return '<option value="'+x.project_id+'" data-kind="'+x.kind+'">'+esc(x.label)+'</option>'; }).join('');
+  $('#mNote').innerHTML = S.me.is_pm
+    ? 'Internal work is open to everyone. Extra items on a booking count as <b>unbooked</b> effort in margin.'
+    : 'You can add internal work. Extra items on a client booking are limited to project managers and admins.';
+}
+$('#addToggle').onclick=function(){
+  const f=$('#addForm'); f.classList.toggle('on');
+  $('#addToggle').innerHTML=f.classList.contains('on')?'&#10005; Cancel':'&#65291; Add something that isn&rsquo;t in PACMAN';
+  if(f.classList.contains('on')) $('#mName').focus();
+};
+$('#mMake').onclick=async function(){
+  const pid=$('#mTarget').value, nm=$('#mName').value.trim();
+  if(!pid) return toast('Nothing to attach it to');
+  if(!nm) return toast('Give it a name');
+  const r=await sb.rpc('create_manual_item',{p_project:pid,p_name:nm});
+  if(r.error) return toast(friendly(r.error),true);
+  const d=r.data, opt=$('#mTarget').selectedOptions[0];
+  TASK[d.task_id]={ task_id:d.task_id, project_id:d.project_id, name:d.name,
+    client:opt.dataset.kind==='internal'?null:opt.textContent, io:null, page:null,
+    roles:['internal'], live:true, booked:false, internal:opt.dataset.kind==='internal', suggest:null };
+  if(!S.deliverables.some(function(x){return x.task_id===d.task_id;})) S.deliverables.push(TASK[d.task_id]);
+  selTask=d.task_id; selStage=null;
+  $('#mName').value=''; $('#addToggle').click();
+  renderAll();
+  toast(d.existing?'That already existed — selected it':'Created and selected');
 };
 
 /* ---------- writes ---------- */
 function tempId(){ return 'tmp-'+(++tmpSeq); }
-
-async function tryAdd(){
-  const mins = parseDur($('#dur').value);
-  if (!selTask) return toast('Pick a deliverable first');
-  if (!(mins>0)) { $('#dur').focus(); return toast('Enter a duration — 1.5, 90m or 1:30'); }
-  if (stageRequired() && !effStage()) return toast('This is booked work — it needs a stage');
-  if (mins > 960){ pendingBig = { mins, date:selDate }; paintGuard(mins); return; }
-  commit(mins);
-}
-async function commit(mins){
-  const t = TASK[selTask];
-  const row = { id:tempId(), task_id:selTask, project_id:t.project_id, date:selDate, mins,
-                stage:effStage(), note:$('#desc').value.trim(), source:'manual', locked:false, _p:true };
-  ENTRIES.push(row);
-  $('#desc').value=''; $('#dur').value=''; selStage=null;
-  renderAll();
-  const saved = await insertEntry(row);
-  if (saved){ Object.assign(row, saved, { _p:false }); delete row._p;
-    if (t.booked) fetchSuggest(selTask);
-    toast(`${hm(mins)} logged on ${fmt(row.date)}`); }
-  else ENTRIES = ENTRIES.filter(e => e !== row);
-  renderAll();
-}
-async function insertEntry(row){
-  const { data, error } = await sb.from('time_entries').insert({
-    user_id: S.me.id, project_id: row.project_id, task_id: row.task_id,
-    entry_date: row.date, duration_sec: row.mins*60,
-    stage_tag_id: row.stage || null, description: row.note || null,
-    source: row.source || 'manual', created_by: S.me.id
-  }).select('id,entry_date,duration_sec,stage_tag_id,description,source,locked').single();
-  if (error){ toast(friendly(error), true); return null; }
-  return { id:data.id, date:data.entry_date, mins:data.duration_sec/60, stage:data.stage_tag_id,
-           note:data.description, source:data.source, locked:data.locked };
-}
 function friendly(err){
-  const m = (err.message||'') + ' ' + (err.hint||'');
-  if (m.includes('stage_required')) return 'Booked work needs a stage tag.';
-  if (m.includes('future_date'))    return 'Time can’t be logged into the future.';
-  if (m.includes('date_too_old'))   return 'That date is too far back.';
-  if (m.includes('duration_sec'))   return 'An entry must be between 1 minute and 24 hours.';
-  if (m.includes('row-level security')) return 'You can only edit your own unlocked entries.';
-  return err.message || 'Could not save.';
+  const m=(err.message||'')+' '+(err.hint||'')+' '+(err.details||'');
+  if(m.indexOf('stage_required')>=0) return 'Booked work needs a stage tag.';
+  if(m.indexOf('future_date')>=0) return 'Time cannot be logged into the future.';
+  if(m.indexOf('date_too_old')>=0) return 'That date is too far back.';
+  if(m.indexOf('end_before_start')>=0) return 'The finish time must be after the start time.';
+  if(m.indexOf('date_mismatch')>=0) return 'Start time falls on a different day.';
+  if(m.indexOf('duration_sec')>=0) return 'An entry must be between 1 minute and 24 hours.';
+  if(m.indexOf('pm_only')>=0) return 'Only a project manager or admin can add extra items to a booking.';
+  if(m.indexOf('name_required')>=0) return 'Give it a name.';
+  if(m.indexOf('row-level security')>=0) return 'You can only edit your own unlocked entries.';
+  return err.message||'Could not save.';
 }
-async function patchEntry(e, patch){
-  const before = { ...e };
-  Object.assign(e, patch); renderAll();
-  const { error } = await sb.from('time_entries').update({
-    entry_date: e.date, duration_sec: e.mins*60, stage_tag_id: e.stage || null,
-    description: e.note || null, edited_by: S.me.id
-  }).eq('id', e.id);
-  if (error){ Object.assign(e, before); renderAll(); toast(friendly(error), true); return false; }
+const stamp = (date,t) => t==null ? null : date+'T'+t2s(t)+':00+08:00';
+async function insertEntry(row){
+  const a=row.start?parseTime(row.start):null, b=row.end?parseTime(row.end):null;
+  const r=await sb.from('time_entries').insert({
+    user_id:S.me.id, project_id:row.project_id, task_id:row.task_id,
+    entry_date:row.date, duration_sec:row.mins*60,
+    started_at:stamp(row.date,a), ended_at:stamp(row.date,b),
+    stage_tag_id:row.stage||null, description:row.note||null,
+    source:row.source||'manual', created_by:S.me.id
+  }).select('id,entry_date,duration_sec,started_at,ended_at,stage_tag_id,description,source,locked').single();
+  if(r.error){ toast(friendly(r.error),true); return null; }
+  const d=r.data;
+  return { id:d.id, date:d.entry_date, mins:d.duration_sec/60,
+           start:d.started_at?hkTime(d.started_at):null, end:d.ended_at?hkTime(d.ended_at):null,
+           stage:d.stage_tag_id, note:d.description, source:d.source, locked:d.locked };
+}
+function hkTime(iso){ const d=new Date(iso);
+  return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Hong_Kong',hour:'2-digit',minute:'2-digit',hour12:false}).format(d); }
+async function patchEntry(e,patch){
+  const before=JSON.parse(JSON.stringify(e));
+  Object.assign(e,patch); renderAll();
+  const a=e.start?parseTime(e.start):null, b=e.end?parseTime(e.end):null;
+  const r=await sb.from('time_entries').update({
+    entry_date:e.date, duration_sec:e.mins*60,
+    started_at:stamp(e.date,a), ended_at:stamp(e.date,b),
+    stage_tag_id:e.stage||null, description:e.note||null, edited_by:S.me.id
+  }).eq('id',e.id);
+  if(r.error){ Object.assign(e,before); renderAll(); toast(friendly(r.error),true); return false; }
   return true;
 }
 async function removeEntry(e){
-  ENTRIES = ENTRIES.filter(x=>x.id!==e.id); renderAll();
-  const { error } = await sb.from('time_entries').delete().eq('id', e.id);
-  if (error){ ENTRIES.push(e); renderAll(); toast(friendly(error), true); return false; }
+  ENTRIES=ENTRIES.filter(function(x){return x.id!==e.id;}); renderAll();
+  const r=await sb.from('time_entries').delete().eq('id',e.id);
+  if(r.error){ ENTRIES.push(e); renderAll(); toast(friendly(r.error),true); return false; }
   return true;
+}
+function tryAdd(){
+  const tt=currentTimes();
+  if(!selTask) return toast('Pick a deliverable first');
+  if(tt.a===null) { $('#tStart').focus(); return toast('Start time not understood — try 9:30 or 930'); }
+  if(tt.b===null) { $('#tEnd').focus(); return toast('Finish not understood — a time like 11:00, or a length like 1.5'); }
+  const mins=tt.b-tt.a;
+  if(mins<=0) return toast('The finish time must be after the start time');
+  if(stageRequired()&&!effStage()) return toast('This is booked work — it needs a stage');
+  const row={ id:tempId(), task_id:selTask, project_id:TASK[selTask].project_id, date:selDate,
+              mins:mins, start:t2s(tt.a), end:t2s(tt.b), stage:effStage(),
+              note:$('#desc').value.trim(), source:'manual', locked:false, _p:true };
+  if(mins>960){ pendingBig=row; paintGuard(mins); return; }
+  commit(row);
+}
+async function commit(row){
+  ENTRIES.push(row);
+  $('#desc').value=''; selStage=null;
+  const a=parseTime(row.end);
+  $('#tStart').value=t2s(a); $('#tEnd').value=t2s(Math.min(a+60,DAY_END));
+  renderAll();
+  const saved=await insertEntry(row);
+  if(saved){ Object.assign(row,saved); delete row._p;
+    if(TASK[row.task_id]&&TASK[row.task_id].booked) fetchSuggest(row.task_id);
+    toast(hm(row.mins)+' logged on '+fmt(row.date)); }
+  else ENTRIES=ENTRIES.filter(function(e){return e!==row;});
+  renderAll();
 }
 
 /* ---------- day list ---------- */
-const totalFor  = d => ENTRIES.filter(e=>e.date===d).reduce((a,e)=>a+e.mins,0);
-const bookedFor = d => ENTRIES.filter(e=>e.date===d && TASK[e.task_id] && TASK[e.task_id].booked)
-                              .reduce((a,e)=>a+e.mins,0);
-
+const totalFor = d => ENTRIES.filter(function(e){return e.date===d;}).reduce(function(a,e){return a+e.mins;},0);
+const bookedFor = d => ENTRIES.filter(function(e){return e.date===d && TASK[e.task_id] && TASK[e.task_id].booked;})
+                              .reduce(function(a,e){return a+e.mins;},0);
 function renderDays(){
-  const dates = [...new Set([...ENTRIES.map(e=>e.date), selDate])].sort().reverse().slice(0,10);
-  $('#days').innerHTML = dates.map(d=>{
-    const rows = ENTRIES.filter(e=>e.date===d).sort((a,b)=> (a.id<b.id?1:-1));
-    const tot = totalFor(d);
-    return `<div class="day ${d===selDate?'focus':''}">
-      <div class="dayhead"><h2>${d===S.today?'Today · ':''}${fmt(d)}</h2>
-        ${d===selDate?'<span class="here">adding here</span>':''}
-        ${tot>720?`<span class="over">${hm(tot)} — long day</span>`:''}
-        <span class="tot">${tot?hm(tot):'—'}</span></div>
-      <div class="list">${ rows.length ? rows.map(entryHTML).join('')
-        : `<div class="emptyday">Nothing logged.${d===selDate?' Use the bar above.':` <button class="ico" style="width:auto;padding:0 8px;display:inline-grid" data-goto="${d}">log here</button>`}</div>` }</div>
-    </div>`;
+  const set={}; ENTRIES.forEach(function(e){ set[e.date]=1; }); set[selDate]=1;
+  const dates=Object.keys(set).sort().reverse().slice(0,10);
+  $('#days').innerHTML=dates.map(function(d){
+    const rows=ENTRIES.filter(function(e){return e.date===d;})
+      .sort(function(a,b){ const x=startMins(a), y=startMins(b);
+        if(x==null&&y==null) return a.id<b.id?1:-1; if(x==null) return 1; if(y==null) return -1; return x-y; });
+    const tot=totalFor(d);
+    return '<div class="day '+(d===selDate?'focus':'')+'">'+
+      '<div class="dayhead"><h2>'+(d===S.today?'Today · ':'')+fmt(d)+'</h2>'+
+      (d===selDate?'<span class="here">adding here</span>':'')+
+      (tot>720?'<span class="over">'+hm(tot)+' &mdash; long day</span>':'')+
+      '<span class="tot">'+(tot?hm(tot):'&mdash;')+'</span></div>'+
+      '<div class="list">'+(rows.length?rows.map(entryHTML).join('')
+        :'<div class="emptyday">Nothing logged.'+(d===selDate?' Use the bar above.':
+          ' <button class="ico" style="width:auto;padding:0 8px;display:inline-grid" data-goto="'+d+'">log here</button>')+'</div>')+
+      '</div></div>';
   }).join('');
-  $$('#days [data-goto]').forEach(b=>b.onclick=()=>{ selDate=b.dataset.goto; renderAll(); $('#dur').focus(); });
-  $$('#days .ico[data-edit]').forEach(b=>b.onclick=()=>{ openEdit = openEdit===b.dataset.edit?null:b.dataset.edit; renderDays(); });
-  $$('#days .ico[data-dup]').forEach(b=>b.onclick=async ()=>{
-    const src = ENTRIES.find(e=>String(e.id)===b.dataset.dup);
-    const row = { id:tempId(), task_id:src.task_id, project_id:src.project_id, date:selDate,
-                  mins:src.mins, stage:src.stage, note:src.note, source:'manual', locked:false, _p:true };
+  $$('#days [data-goto]').forEach(function(b){ b.onclick=function(){ selDate=b.dataset.goto; resetTimes(); renderAll(); }; });
+  $$('#days .ico[data-edit]').forEach(function(b){ b.onclick=function(){
+    openEdit = openEdit===b.dataset.edit?null:b.dataset.edit; renderDays(); }; });
+  $$('#days .ico[data-dup]').forEach(function(b){ b.onclick=async function(){
+    const src=ENTRIES.filter(function(e){return String(e.id)===b.dataset.dup;})[0];
+    const a=nextFreeStart(selDate);
+    const row={ id:tempId(),task_id:src.task_id,project_id:src.project_id,date:selDate,mins:src.mins,
+                start:t2s(a), end:t2s(a+src.mins), stage:src.stage,note:src.note,source:'manual',locked:false,_p:true };
     ENTRIES.push(row); renderAll();
-    const saved = await insertEntry(row);
-    if (saved){ Object.assign(row, saved); delete row._p; toast(`Copied onto ${fmt(selDate)}`); }
-    else ENTRIES = ENTRIES.filter(e=>e!==row);
+    const saved=await insertEntry(row);
+    if(saved){ Object.assign(row,saved); delete row._p; toast('Copied onto '+fmt(selDate)); }
+    else ENTRIES=ENTRIES.filter(function(e){return e!==row;});
     renderAll();
-  });
-  $$('#days .tagchip.miss').forEach(b=>b.onclick=()=>{
-    const e = ENTRIES.find(x=>String(x.id)===b.dataset.stage);
-    openStageMenu(b, e.stage, s => patchEntry(e, { stage:s }));
-  });
-  if (openEdit) wireSheet();
+  }; });
+  $$('#days .tagchip.miss').forEach(function(b){ b.onclick=function(){
+    const e=ENTRIES.filter(function(x){return String(x.id)===b.dataset.stage;})[0];
+    openStageMenu(b,e.stage,function(s){ patchEntry(e,{stage:s}); }); }; });
+  if(openEdit) wireSheet();
 }
 function entryHTML(e){
-  const t = TASK[e.task_id] || { name:'(unknown deliverable)', booked:true, client:'' };
-  const needs = t.booked && !e.stage;
-  const sn = stageName(e.stage);
-  return `<div class="e ${e._p?'pending':''}">
-    <span class="bar ${t.booked?'':'ub'}"></span>
-    <div><div class="t1">${e.note?esc(e.note):'<span class="ph">No note</span>'}</div>
-      <div class="t2">${esc(t.name)}${t.client?' — '+esc(t.client):''}</div></div>
-    ${ needs ? `<span class="tagchip miss" data-stage="${e.id}">⚠ add stage</span>`
-             : sn ? `<span class="tagchip">${esc(sn)}</span>`
-                  : `<span class="tagchip" style="color:var(--muted)">—</span>` }
-    <span class="d">${hm(e.mins)}</span>
-    <span style="display:flex;gap:6px">
-      <button class="ico" title="Copy onto ${fmt(selDate)}" data-dup="${e.id}">⧉</button>
-      <button class="ico" title="Edit" data-edit="${e.id}">✎</button></span>
-  </div>${ openEdit===String(e.id) ? sheetHTML(e) : '' }`;
+  const t=TASK[e.task_id]||{name:'(unknown deliverable)',booked:true,client:''};
+  const needs=t.booked&&!e.stage, sn=stageName(e.stage);
+  const when = e.start&&e.end ? '<span class="when">'+e.start+'–'+e.end+'</span>'
+                              : '<span class="when none">no time set</span>';
+  return '<div class="e '+(e._p?'pending':'')+'">'+
+    '<span class="bar '+(t.booked?'':'ub')+'"></span>'+
+    '<div><div class="t1">'+(e.note?esc(e.note):'<span class="ph">No note</span>')+'</div>'+
+    '<div class="t2">'+esc(t.name)+(t.client?' &mdash; '+esc(t.client):'')+'</div></div>'+
+    (needs?'<span class="tagchip miss" data-stage="'+e.id+'">&#9888; add stage</span>'
+          :sn?'<span class="tagchip">'+esc(sn)+'</span>'
+             :'<span class="tagchip" style="color:var(--muted)">&mdash;</span>')+
+    when+'<span class="d">'+hm(e.mins)+'</span>'+
+    '<span style="display:flex;gap:6px">'+
+    '<button class="ico" title="Copy onto '+fmt(selDate)+'" data-dup="'+e.id+'">&#10683;</button>'+
+    '<button class="ico" title="Edit" data-edit="'+e.id+'">&#9998;</button></span>'+
+  '</div>'+(openEdit===String(e.id)?sheetHTML(e):'');
 }
 function sheetHTML(e){
-  const t = TASK[e.task_id] || { booked:true };
-  const days = Array.from({length:21},(_,i)=>shift(S.today,-i));
-  const prev = ENTRIES.filter(x=>x.task_id===e.task_id && x.id!==e.id && x.note).sort((a,b)=>a.id<b.id?1:-1)[0];
-  return `<div class="sheet"><div class="sgrid">
-    <div><label>Duration</label><input id="sD" value="${hm(e.mins)}"></div>
-    <div><label>Day</label><select id="sDate">${days.map(d=>`<option value="${d}" ${d===e.date?'selected':''}>${fmt(d)}${d===S.today?' (today)':''}</option>`).join('')}</select></div>
-    <div><label>Stage${t.booked?' — required':''}</label><select id="sS">
-      <option value="">${t.booked?'— choose —':'None'}</option>
-      ${S.stages.map(s=>`<option value="${s.id}" ${s.id===e.stage?'selected':''}>${esc(s.name)}</option>`).join('')}
-    </select></div>
-    <div><label>Note</label><input id="sN" value="${esc(e.note)}" placeholder="${esc(prev?prev.note:'optional')}"></div>
-    <div class="sbtns"><button class="sv" id="sSave">Save</button><button class="cn" id="sCancel">Cancel</button>
-      <button class="del" id="sDel">Delete</button></div>
-  </div></div>`;
+  const t=TASK[e.task_id]||{booked:true};
+  const days=Array.from({length:21},function(_,i){return shift(S.today,-i);});
+  const prev=ENTRIES.filter(function(x){return x.task_id===e.task_id&&x.id!==e.id&&x.note;})
+                    .sort(function(a,b){return a.id<b.id?1:-1;})[0];
+  return '<div class="sheet"><div class="sgrid">'+
+    '<div><label>Start</label><input id="sA" value="'+(e.start||'')+'" placeholder="—"></div>'+
+    '<div><label>Finish</label><input id="sB" value="'+(e.end||'')+'" placeholder="—"></div>'+
+    '<div><label>Day</label><select id="sDate">'+days.map(function(d){
+      return '<option value="'+d+'" '+(d===e.date?'selected':'')+'>'+fmt(d)+(d===S.today?' (today)':'')+'</option>'; }).join('')+'</select></div>'+
+    '<div><label>Stage'+(t.booked?' &mdash; required':'')+'</label><select id="sS">'+
+      '<option value="">'+(t.booked?'&mdash; choose &mdash;':'None')+'</option>'+
+      S.stages.map(function(s){ return '<option value="'+s.id+'" '+(s.id===e.stage?'selected':'')+'>'+esc(s.name)+'</option>'; }).join('')+
+    '</select></div>'+
+    '<div><label>Note</label><input id="sN" value="'+esc(e.note)+'" placeholder="'+esc(prev?prev.note:'optional')+'"></div>'+
+    '<div class="sbtns"><button class="sv" id="sSave">Save</button><button class="cn" id="sCancel">Cancel</button>'+
+    '<button class="del" id="sDel">Delete</button></div></div>'+
+    '<p class="note" style="margin:9px 0 0">Leave both times blank to keep it as a plain duration of '+hm(e.mins)+'.</p></div>';
 }
 function wireSheet(){
-  const e = ENTRIES.find(x=>String(x.id)===openEdit); if (!e) return;
-  $('#sCancel').onclick = () => { openEdit=null; renderDays(); };
-  $('#sDel').onclick = async () => { openEdit=null; await removeEntry(e); toast('Entry deleted'); };
-  $('#sSave').onclick = async () => {
-    const m = parseDur($('#sD').value);
-    if (!(m>0)) return toast('Duration not understood — try 1.5, 90m or 1:30');
-    const t = TASK[e.task_id] || {};
-    if (t.booked && !$('#sS').value) return toast('Booked work needs a stage');
-    openEdit = null;
-    if (await patchEntry(e, { mins:m, date:$('#sDate').value, stage:$('#sS').value||null, note:$('#sN').value.trim() }))
-      toast('Saved');
+  const e=ENTRIES.filter(function(x){return String(x.id)===openEdit;})[0]; if(!e) return;
+  $('#sCancel').onclick=function(){ openEdit=null; renderDays(); };
+  $('#sDel').onclick=async function(){ openEdit=null; await removeEntry(e); toast('Entry deleted'); };
+  $('#sSave').onclick=async function(){
+    const a=parseTime($('#sA').value), b=parseTime($('#sB').value);
+    const t=TASK[e.task_id]||{};
+    if(t.booked&&!$('#sS').value) return toast('Booked work needs a stage');
+    let patch={ date:$('#sDate').value, stage:$('#sS').value||null, note:$('#sN').value.trim() };
+    const bothBlank = !$('#sA').value.trim() && !$('#sB').value.trim();
+    if(bothBlank){ patch.start=null; patch.end=null; }
+    else {
+      if(a===null) return toast('Start time not understood');
+      if(b===null) return toast('Finish time not understood');
+      if(b<=a) return toast('The finish time must be after the start time');
+      patch.start=t2s(a); patch.end=t2s(b); patch.mins=b-a;
+    }
+    openEdit=null;
+    if(await patchEntry(e,patch)) toast('Saved');
   };
 }
 
 /* ---------- tiles ---------- */
 function renderTiles(){
-  const selTot = totalFor(selDate);
-  $('#selLab').textContent = selDate===S.today ? 'TODAY' : fmt(selDate).toUpperCase();
+  const selTot=totalFor(selDate);
+  $('#selLab').textContent = selDate===S.today?'TODAY':fmt(selDate).toUpperCase();
   $('#kSel').textContent = selTot?hm(selTot):'0:00';
-  const n = ENTRIES.filter(e=>e.date===selDate).length;
-  $('#kSelFoot').textContent = n ? `${n} ${n===1?'entry':'entries'}` : 'nothing logged yet';
-
-  const cap = (S.me.capacity_min||420) * 5;
-  const wk = weekDays(monday(S.today)), wkTot = wk.reduce((a,d)=>a+totalFor(d),0);
-  const elapsed = wk.filter(d=>d<=S.today).length;
-  $('#kWeek').innerHTML = hm(wkTot) + ` <small>/ ${hm(cap)}</small>`;
-  $('#kWeekBar').style.width = Math.min(100, wkTot/cap*100)+'%';
-  $('#kWeekFoot').textContent = `${wk.filter(d=>totalFor(d)>0).length} of ${elapsed} ${elapsed===1?'day':'days'} so far`;
-
-  const pw = weekDays(shift(monday(S.today),-7)), pwTot = pw.reduce((a,d)=>a+totalFor(d),0);
-  $('#kPrev').textContent = hm(pwTot);
-  const pd = pw.filter(d=>totalFor(d)>0).length;
-  $('#kPrevFoot').textContent = `${pd} ${pd===1?'day':'days'} logged`;
-
-  const miss = ENTRIES.filter(e => TASK[e.task_id] && TASK[e.task_id].booked && !e.stage);
-  $('#kMiss').textContent = miss.length;
-  $('#kMiss').style.color = miss.length ? 'var(--warn-text)' : '';
-  $('#kMissFoot').innerHTML = miss.length
-    ? `<button class="ico" style="width:auto;padding:0 8px;display:inline-grid" id="fixMiss">Fix the oldest</button>` : 'all tagged';
-  if (miss.length) $('#fixMiss').onclick = () => {
-    const t = miss.sort((a,b)=>a.date<b.date?-1:1)[0];
-    selDate = t.date; openEdit = String(t.id); renderAll();
-    const el = document.querySelector('.day.focus'); if (el) el.scrollIntoView({behavior:'smooth',block:'center'});
+  const n=ENTRIES.filter(function(e){return e.date===selDate;}).length;
+  $('#kSelFoot').textContent = n ? n+' '+(n===1?'entry':'entries') : 'nothing logged yet';
+  const cap=(S.me.capacity_min||420)*5;
+  const wk=weekDays(monday(S.today)), wkTot=wk.reduce(function(a,d){return a+totalFor(d);},0);
+  const elapsed=wk.filter(function(d){return d<=S.today;}).length;
+  $('#kWeek').innerHTML=hm(wkTot)+' <small>/ '+hm(cap)+'</small>';
+  $('#kWeekBar').style.width=Math.min(100,wkTot/cap*100)+'%';
+  const dl=wk.filter(function(d){return totalFor(d)>0;}).length;
+  $('#kWeekFoot').textContent=dl+' of '+elapsed+' '+(elapsed===1?'day':'days')+' so far';
+  const pw=weekDays(shift(monday(S.today),-7)), pwTot=pw.reduce(function(a,d){return a+totalFor(d);},0);
+  const pd=pw.filter(function(d){return totalFor(d)>0;}).length;
+  $('#kPrev').textContent=hm(pwTot);
+  $('#kPrevFoot').textContent=pd+' '+(pd===1?'day':'days')+' logged';
+  const miss=ENTRIES.filter(function(e){return TASK[e.task_id]&&TASK[e.task_id].booked&&!e.stage;});
+  $('#kMiss').textContent=miss.length;
+  $('#kMiss').style.color=miss.length?'var(--warn-text)':'';
+  $('#kMissFoot').innerHTML=miss.length
+    ?'<button class="ico" style="width:auto;padding:0 8px;display:inline-grid" id="fixMiss">Fix the oldest</button>':'all tagged';
+  if(miss.length) $('#fixMiss').onclick=function(){
+    const t=miss.sort(function(a,b){return a.date<b.date?-1:1;})[0];
+    selDate=t.date; openEdit=String(t.id); renderAll();
+    const el=document.querySelector('.day.focus'); if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
   };
-  $('#mineN').textContent = S.deliverables.filter(d=>d.live).length;
-  $('#subline').textContent = `${fmt(S.today)} · ${S.deliverables.filter(d=>d.live).length} live deliverables`;
+  const live=S.deliverables.filter(function(d){return d.live;}).length;
+  $('#mineN').textContent=live;
+  $('#subline').textContent=fmt(S.today)+' · '+live+' live deliverables';
 }
 
-/* ---------- week grid ---------- */
+/* ---------- calendar ---------- */
+function calDays(){ return isNarrow() ? [selDate] : weekDays(calMon); }
+function laneOut(list){
+  // greedy column packing for overlapping blocks
+  const items=list.slice().sort(function(a,b){ return startMins(a)-startMins(b); });
+  const lanes=[];
+  items.forEach(function(e){
+    const s=startMins(e), en=s+e.mins;
+    let placed=false;
+    for(let i=0;i<lanes.length;i++){
+      if(lanes[i]<=s){ e._lane=i; lanes[i]=en; placed=true; break; }
+    }
+    if(!placed){ e._lane=lanes.length; lanes.push(en); }
+  });
+  const n=Math.max(1,lanes.length);
+  items.forEach(function(e){ e._lanes=n; });
+  return items;
+}
+function renderCal(){
+  const days=calDays(), cols=days.length;
+  const grid=$('#calGrid'), head=$('#calHead');
+  grid.style.setProperty('--cols',cols); head.style.setProperty('--cols',cols);
+  grid.style.setProperty('--hh',HH+'px');
+  const d0=toD(days[0]), d1=toD(days[cols-1]);
+  $('#cLab').textContent = cols===1 ? fmt(days[0])
+    : d0.getDate()+'–'+d1.getDate()+' '+MON[d1.getMonth()];
+
+  head.innerHTML='<div></div>'+days.map(function(d){
+    const tot=totalFor(d);
+    return '<div class="'+(d===S.today?'isnow':'')+'">'+fmt(d).replace(' ','<br>')+
+      '<span class="ct">'+(tot?hm(tot):'—')+'</span></div>'; }).join('');
+
+  const hours=[]; for(let t=DAY_START;t<DAY_END;t+=60) hours.push(t);
+  let html='<div class="gutter">'+hours.map(function(t){ return '<div>'+t2s(t)+'</div>'; }).join('')+'</div>';
+  days.forEach(function(d){
+    const wknd=[0,6].indexOf(toD(d).getDay())>=0;
+    html+='<div class="daycol'+(wknd?' wknd':'')+'" data-date="'+d+'">'+
+      hours.map(function(){ return '<div class="hr"></div>'; }).join('')+'</div>';
+  });
+  grid.innerHTML=html;
+
+  days.forEach(function(d){
+    const col=grid.querySelector('.daycol[data-date="'+d+'"]');
+    const timed=ENTRIES.filter(function(e){ return e.date===d && e.start && e.end; });
+    laneOut(timed).forEach(function(e){
+      const s=startMins(e), top=(s-DAY_START)/60*HH, h=Math.max(16,e.mins/60*HH);
+      const t=TASK[e.task_id]||{name:'?',booked:true};
+      const w=100/e._lanes, left=e._lane*w;
+      const b=document.createElement('div');
+      b.className='blk'+(t.booked?'':' ub')+(e._p?' pending':'');
+      b.style.top=top+'px'; b.style.height=h+'px';
+      b.style.left='calc('+left+'% + 2px)'; b.style.width='calc('+w+'% - 4px)';
+      b.dataset.id=e.id;
+      b.innerHTML='<b>'+esc(t.name)+'</b><span>'+e.start+'–'+e.end+' · '+hm(e.mins)+'</span>'+
+                  (e.note?'<span> · '+esc(e.note)+'</span>':'')+'<div class="rz"></div>';
+      col.appendChild(b);
+    });
+    if(d===S.today){
+      const now=new Date();
+      const mins=+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Hong_Kong',hour:'2-digit',hour12:false}).format(now)*60
+                + +new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Hong_Kong',minute:'2-digit'}).format(now);
+      if(mins>=DAY_START&&mins<=DAY_END){
+        const l=document.createElement('div'); l.className='nowline';
+        l.style.top=((mins-DAY_START)/60*HH)+'px'; col.appendChild(l);
+      }
+    }
+  });
+
+  // unscheduled strip
+  const un=ENTRIES.filter(function(e){ return days.indexOf(e.date)>=0 && !(e.start&&e.end); });
+  $('#unsched').innerHTML = un.length
+    ? '<div class="unsched"><b>No time set:</b>'+un.map(function(e){
+        const t=TASK[e.task_id]||{name:'?'};
+        return '<button class="uchip" data-un="'+e.id+'">'+esc(t.name).slice(0,42)+' · '+hm(e.mins)+
+               ' · '+fmt(e.date).slice(0,6)+'</button>'; }).join('')+'</div>'
+    : '';
+  $$('#unsched .uchip').forEach(function(b){ b.onclick=function(){
+    const e=ENTRIES.filter(function(x){return String(x.id)===b.dataset.un;})[0];
+    selDate=e.date; openEdit=String(e.id);
+    $$('.rail a').forEach(function(x){x.classList.remove('on');});
+    document.querySelector('.rail a[data-go="log"]').classList.add('on');
+    $$('.panel').forEach(function(p){p.classList.remove('on');});
+    $('#p-log').classList.add('on'); renderAll();
+    const el=document.querySelector('.day.focus'); if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+  }; });
+
+  wireCalDrag();
+}
+function yToMin(col,clientY){
+  const r=col.getBoundingClientRect();
+  return Math.max(DAY_START, Math.min(DAY_END, snap(DAY_START + (clientY-r.top)/HH*60)));
+}
+function wireCalDrag(){
+  const grid=$('#calGrid');
+  grid.querySelectorAll('.daycol').forEach(function(col){
+    col.onpointerdown=function(ev){
+      const blk=ev.target.closest('.blk');
+      if(blk){ startBlockDrag(ev,blk,col,ev.target.classList.contains('rz')); return; }
+      if(col.dataset.date > S.today){ toast('No logging into the future'); return; }
+      if(!selTask){ toast('Pick a deliverable on the Log screen first'); return; }
+      ev.preventDefault(); col.setPointerCapture(ev.pointerId);
+      const a=yToMin(col,ev.clientY);
+      const g=document.createElement('div'); g.className='ghost'; col.appendChild(g);
+      drag={mode:'new',col:col,a:a,b:a,g:g};
+      paintGhost();
+    };
+  });
+  grid.onpointermove=function(ev){
+    if(!drag) return;
+    if(drag.mode==='new'){ drag.b=yToMin(drag.col,ev.clientY); paintGhost(); }
+    else if(drag.mode==='move'){
+      const m=yToMin(drag.col,ev.clientY);
+      const delta=m-drag.grab;
+      drag.a=Math.max(DAY_START,Math.min(DAY_END-drag.len,drag.a0+delta));
+      drag.b=drag.a+drag.len; paintBlock();
+    } else if(drag.mode==='resize'){
+      drag.b=Math.max(drag.a+SNAP, yToMin(drag.col,ev.clientY)); paintBlock();
+    }
+  };
+  grid.onpointerup=async function(){
+    if(!drag) return;
+    const d=drag; drag=null;
+    if(d.mode==='new'){
+      d.g.remove();
+      const a=Math.min(d.a,d.b), b=Math.max(d.a,d.b);
+      if(b-a < SNAP) { renderCal(); return; }
+      const date=d.col.dataset.date;
+      if(stageRequired()&&!effStage()){ toast('This is booked work — it needs a stage'); renderCal(); return; }
+      const row={ id:tempId(),task_id:selTask,project_id:TASK[selTask].project_id,date:date,
+                  mins:b-a,start:t2s(a),end:t2s(b),stage:effStage(),note:'',source:'manual',locked:false,_p:true };
+      ENTRIES.push(row); renderAll();
+      const saved=await insertEntry(row);
+      if(saved){ Object.assign(row,saved); delete row._p; toast(hm(row.mins)+' logged on '+fmt(date)); }
+      else ENTRIES=ENTRIES.filter(function(e){return e!==row;});
+      renderAll();
+    } else {
+      const e=d.e, a=Math.min(d.a,d.b), b=Math.max(d.a,d.b);
+      if(e.start===t2s(a)&&e.end===t2s(b)){ renderCal(); return; }
+      await patchEntry(e,{start:t2s(a),end:t2s(b),mins:b-a});
+    }
+  };
+  grid.onpointercancel=function(){ if(drag&&drag.g) drag.g.remove(); drag=null; renderCal(); };
+}
+function paintGhost(){
+  const a=Math.min(drag.a,drag.b), b=Math.max(drag.a,drag.b);
+  drag.g.style.top=((a-DAY_START)/60*HH)+'px';
+  drag.g.style.height=Math.max(2,(b-a)/60*HH)+'px';
+  drag.g.textContent=t2s(a)+'–'+t2s(b)+' · '+hm(b-a);
+}
+function startBlockDrag(ev,blk,col,resize){
+  const e=ENTRIES.filter(function(x){return String(x.id)===blk.dataset.id;})[0];
+  if(!e||e.locked) return;
+  ev.preventDefault(); ev.stopPropagation(); col.setPointerCapture(ev.pointerId);
+  const a=parseTime(e.start), b=parseTime(e.end);
+  blk.classList.add('drag');
+  drag={ mode:resize?'resize':'move', col:col, e:e, blk:blk, a:a, b:b, a0:a, len:b-a,
+         grab:yToMin(col,ev.clientY) };
+}
+function paintBlock(){
+  const a=Math.min(drag.a,drag.b), b=Math.max(drag.a,drag.b);
+  drag.blk.style.top=((a-DAY_START)/60*HH)+'px';
+  drag.blk.style.height=Math.max(16,(b-a)/60*HH)+'px';
+  const sp=drag.blk.querySelector('span');
+  if(sp) sp.textContent=t2s(a)+'–'+t2s(b)+' · '+hm(b-a);
+}
+$('#cPrev').onclick=function(){ if(isNarrow()){ selDate=shift(selDate,-1); } else calMon=shift(calMon,-7); renderAll(); };
+$('#cNext').onclick=function(){ if(isNarrow()){ if(selDate<S.today) selDate=shift(selDate,1); else return toast('No logging into the future'); } else calMon=shift(calMon,7); renderAll(); };
+$('#cToday').onclick=function(){ selDate=S.today; calMon=monday(S.today); renderAll(); };
+
+/* ---------- week grid + chart ---------- */
 function weekRows(){
-  const days = weekDays(weekMon);
-  const used = [...new Set(ENTRIES.filter(e=>days.includes(e.date)).map(e=>e.task_id))];
-  const rest = S.deliverables.filter(d=>d.live && !used.includes(d.task_id)).slice(0, Math.max(0, 8-used.length))
-                             .map(d=>d.task_id);
-  return [...used, ...rest].filter(id=>TASK[id]);
+  const days=weekDays(weekMon), used=[];
+  ENTRIES.forEach(function(e){ if(days.indexOf(e.date)>=0&&used.indexOf(e.task_id)<0) used.push(e.task_id); });
+  const rest=S.deliverables.filter(function(d){return d.live&&used.indexOf(d.task_id)<0;})
+    .slice(0,Math.max(0,8-used.length)).map(function(d){return d.task_id;});
+  return used.concat(rest).filter(function(id){return TASK[id];});
 }
-const cellMins = (task,date) => ENTRIES.filter(e=>e.task_id===task && e.date===date).reduce((a,e)=>a+e.mins,0);
-
-async function setCell(task, date, mins){
-  const hits = ENTRIES.filter(e=>e.task_id===task && e.date===date);
-  if (!mins){ for (const h of hits) await removeEntry(h); return; }
-  if (hits.length){
-    await patchEntry(hits[0], { mins });
-    for (let i=1;i<hits.length;i++) await removeEntry(hits[i]);
+const cellMins=(task,date)=>ENTRIES.filter(function(e){return e.task_id===task&&e.date===date;})
+  .reduce(function(a,e){return a+e.mins;},0);
+async function setCell(task,date,mins){
+  const hits=ENTRIES.filter(function(e){return e.task_id===task&&e.date===date;});
+  if(!mins){ for(const h of hits) await removeEntry(h); return; }
+  if(hits.length){
+    const h=hits[0];
+    const patch = h.start ? {mins:mins,end:t2s(parseTime(h.start)+mins)} : {mins:mins};
+    await patchEntry(h,patch);
+    for(let i=1;i<hits.length;i++) await removeEntry(hits[i]);
   } else {
-    const t = TASK[task];
-    const row = { id:tempId(), task_id:task, project_id:t.project_id, date, mins,
-                  stage:t.suggest||null, note:'', source:'grid', locked:false, _p:true };
+    const t=TASK[task];
+    const row={ id:tempId(),task_id:task,project_id:t.project_id,date:date,mins:mins,
+                start:null,end:null,stage:t.suggest||null,note:'',source:'grid',locked:false,_p:true };
     ENTRIES.push(row); renderAll();
-    const saved = await insertEntry(row);
-    if (saved){ Object.assign(row, saved); delete row._p; } else ENTRIES = ENTRIES.filter(e=>e!==row);
+    const saved=await insertEntry(row);
+    if(saved){ Object.assign(row,saved); delete row._p; } else ENTRIES=ENTRIES.filter(function(e){return e!==row;});
   }
 }
 function renderWeek(){
-  const days = weekDays(weekMon), d0=toD(days[0]), d6=toD(days[6]);
-  $('#wLab').textContent = `${d0.getDate()}–${d6.getDate()} ${MON[d6.getMonth()]}`;
-  const rows = weekRows();
-  $('#wbody').innerHTML = rows.map(id=>{
-    const t = TASK[id], col = PAGE_COL[t.page] || '#c3c2b7';
-    const cells = days.map((d,i)=>{
-      const m = cellMins(id,d), cls = i===5?'sat':i===6?'sun':'';
-      const future = d > S.today;
-      return `<td class="n ${cls}"><input class="cell ${m?'has':''}" placeholder="${future?'':'·'}" ${future?'disabled':''}
-        data-task="${id}" data-date="${d}" value="${m?hm(m):''}"></td>`;
+  const days=weekDays(weekMon), d0=toD(days[0]), d6=toD(days[6]);
+  $('#wLab').textContent=d0.getDate()+'–'+d6.getDate()+' '+MON[d6.getMonth()];
+  const rows=weekRows();
+  $('#wbody').innerHTML=rows.map(function(id){
+    const t=TASK[id], col=PAGE_COL[t.page]||'#c3c2b7';
+    const cells=days.map(function(d,i){
+      const m=cellMins(id,d), cls=i===5?'sat':i===6?'sun':'', future=d>S.today;
+      return '<td class="n '+cls+'"><input class="cell '+(m?'has':'')+'" placeholder="'+(future?'':'·')+'" '+
+        (future?'disabled':'')+' data-task="'+id+'" data-date="'+d+'" value="'+(m?hm(m):'')+'"></td>';
     }).join('');
-    const tot = days.reduce((a,d)=>a+cellMins(id,d),0);
-    return `<tr><td><div class="rowlab">
-      <span class="pg" style="width:24px;height:24px;font-size:10px;background:${col}">${esc(t.page||'—')}</span>
-      <div><div style="font-size:13px">${esc(t.name)}</div>
-      <div style="font-size:11.5px;color:var(--muted)">${esc(t.client||'internal')}${t.booked?'':' · <b style="color:var(--unbooked)">unbooked</b>'}</div></div>
-    </div></td>${cells}<td class="n"><b>${tot?hm(tot):'—'}</b></td></tr>`;
+    const tot=days.reduce(function(a,d){return a+cellMins(id,d);},0);
+    return '<tr><td><div class="rowlab">'+
+      '<span class="pg" style="width:24px;height:24px;font-size:10px;background:'+col+'">'+esc(t.page||'&mdash;')+'</span>'+
+      '<div><div style="font-size:13px">'+esc(t.name)+'</div>'+
+      '<div style="font-size:11.5px;color:var(--muted)">'+esc(t.client||'internal')+
+      (t.booked?'':' · <b style="color:var(--unbooked)">unbooked</b>')+'</div></div>'+
+      '</div></td>'+cells+'<td class="n"><b>'+(tot?hm(tot):'&mdash;')+'</b></td></tr>';
   }).join('');
-  const colTot = days.map(d=>rows.reduce((a,id)=>a+cellMins(id,d),0));
-  const grand = colTot.reduce((a,b)=>a+b,0);
-  $('#wfoot').innerHTML = `<tr><td>Total</td>${colTot.map((m,i)=>
-    `<td class="n ${i===5?'sat':i===6?'sun':''} ${m>720?'hot':''}">${m?hm(m):'—'}</td>`).join('')}
-    <td class="n">${grand?hm(grand):'—'}</td></tr>`;
-  $$('#wbody .cell').forEach(inp=>{
-    inp.onfocus = () => inp.select();
-    inp.onchange = async () => {
-      const v = inp.value.trim(), m = v==='' ? 0 : parseDur(v);
-      if (m===null){ toast('Try 1.5, 90m or 1:30'); inp.value=''; return; }
-      const t = TASK[inp.dataset.task];
-      if (m && t.booked && !t.suggest){ toast('That deliverable needs a stage — add it on the Log screen'); inp.value=''; return; }
-      await setCell(inp.dataset.task, inp.dataset.date, m);
-      $('#wkSaved').textContent = 'saved';
-      renderAll();
+  const colTot=days.map(function(d){ return rows.reduce(function(a,id){return a+cellMins(id,d);},0); });
+  const grand=colTot.reduce(function(a,b){return a+b;},0);
+  $('#wfoot').innerHTML='<tr><td>Total</td>'+colTot.map(function(m,i){
+    return '<td class="n '+(i===5?'sat':i===6?'sun':'')+' '+(m>720?'hot':'')+'">'+(m?hm(m):'&mdash;')+'</td>'; }).join('')+
+    '<td class="n">'+(grand?hm(grand):'&mdash;')+'</td></tr>';
+  $$('#wbody .cell').forEach(function(inp){
+    inp.onfocus=function(){ inp.select(); };
+    inp.onchange=async function(){
+      const v=inp.value.trim(), m=v===''?0:parseDur(v);
+      if(m===null){ toast('Try 1.5, 90m or 1:30'); inp.value=''; return; }
+      const t=TASK[inp.dataset.task];
+      if(m&&t.booked&&!t.suggest){ toast('That deliverable needs a stage — set one on the Log screen first'); inp.value=''; return; }
+      await setCell(inp.dataset.task,inp.dataset.date,m);
+      $('#wkSaved').textContent='saved'; renderAll();
     };
   });
+  // chart
+  const capH=(S.me.capacity_min||420)/60;
+  const MAXH=Math.max(capH+2, Math.ceil(Math.max.apply(null,days.map(function(d){return totalFor(d);}))/60)+1);
+  $('#bars').innerHTML=days.map(function(d){
+    const b=bookedFor(d)/60, u=(totalFor(d)-bookedFor(d))/60, tot=b+u;
+    const tip=tot?fmt(d)+' — '+tot.toFixed(2)+'h ('+b.toFixed(2)+'h booked, '+u.toFixed(2)+'h unbooked)':fmt(d)+' — nothing logged';
+    return '<div class="col" title="'+tip+'">'+(tot?'<div class="vlab">'+tot.toFixed(1)+'h</div>':'')+
+      (u?'<div class="seg u" style="height:'+(u/MAXH*100)+'%"></div>':'')+
+      (b?'<div class="seg b" style="height:'+(b/MAXH*100)+'%"></div>':'')+'</div>';
+  }).join('');
+  $('#capline').style.bottom=(capH/MAXH*100)+'%';
+  $('#capline').querySelector('b').textContent=capH+'h';
+  $('#xr').innerHTML=days.map(function(d){ return '<div>'+DOW[toD(d).getDay()]+' '+toD(d).getDate()+'</div>'; }).join('');
 }
-$('#wPrev').onclick = () => { weekMon = shift(weekMon,-7); renderWeek(); };
-$('#wNext').onclick = () => { weekMon = shift(weekMon, 7); renderWeek(); };
-$('#copyLast').onclick = async () => {
-  const prev = weekDays(shift(weekMon,-7)), cur = weekDays(weekMon);
-  let n = 0;
-  for (let i=0;i<5;i++){
-    if (cur[i] > S.today) continue;
-    const tasks = [...new Set(ENTRIES.filter(e=>e.date===prev[i]).map(e=>e.task_id))];
-    for (const id of tasks){
-      if (cellMins(id, cur[i])) continue;
-      await setCell(id, cur[i], cellMins(id, prev[i])); n++;
-    }
+$('#wPrev').onclick=function(){ weekMon=shift(weekMon,-7); renderWeek(); };
+$('#wNext').onclick=function(){ weekMon=shift(weekMon,7); renderWeek(); };
+$('#copyLast').onclick=async function(){
+  const prev=weekDays(shift(weekMon,-7)), cur=weekDays(weekMon); let n=0;
+  for(let i=0;i<5;i++){
+    if(cur[i]>S.today) continue;
+    const tasks=[]; ENTRIES.forEach(function(e){ if(e.date===prev[i]&&tasks.indexOf(e.task_id)<0) tasks.push(e.task_id); });
+    for(const id of tasks){ if(cellMins(id,cur[i])) continue; await setCell(id,cur[i],cellMins(id,prev[i])); n++; }
   }
-  renderAll(); toast(n?`Copied ${n} cells from last week`:'Nothing to copy');
+  renderAll(); toast(n?('Copied '+n+' cells from last week'):'Nothing to copy');
 };
 
 /* ---------- wiring ---------- */
-$('#dPrev').onclick = () => { selDate = shift(selDate,-1); renderAll(); };
-$('#dNext').onclick = () => { if (selDate < S.today){ selDate = shift(selDate,1); renderAll(); } else toast('No logging into the future'); };
-$$('.quick[data-jump]').forEach(b => b.onclick = () => {
-  selDate = b.dataset.jump==='fri' ? lastFriday() : shift(S.today, +b.dataset.jump); renderAll();
+$('#dPrev').onclick=function(){ selDate=shift(selDate,-1); resetTimes(); renderAll(); };
+$('#dNext').onclick=function(){ if(selDate<S.today){ selDate=shift(selDate,1); resetTimes(); renderAll(); } else toast('No logging into the future'); };
+$$('.quick[data-jump]').forEach(function(b){ b.onclick=function(){
+  selDate=b.dataset.jump==='fri'?lastFriday():shift(S.today,+b.dataset.jump); resetTimes(); renderAll(); }; });
+$('#pickBtn').onclick=function(e){
+  if(selTask&&e.target.classList.contains('x')){ selTask=null; selStage=null; renderRows(); paintBar(); return; }
+  $('#dsearch').focus(); };
+$('#stageBtn').onclick=function(e){
+  if(!selTask) return toast('Pick a deliverable first');
+  openStageMenu(e.currentTarget,effStage(),function(s){ selStage=s; paintBar(); }); };
+$('#tStart').oninput=paintBar; $('#tEnd').oninput=paintBar;
+$('#tStart').onkeydown=function(e){ if(e.key==='Enter'){ $('#tEnd').focus(); } };
+$('#tEnd').onkeydown=function(e){ if(e.key==='Enter') tryAdd(); };
+$('#desc').onkeydown=function(e){ if(e.key==='Enter') tryAdd(); };
+$('#addBtn').onclick=tryAdd;
+$$('.dtab').forEach(function(b){ b.onclick=function(){
+  $$('.dtab').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); dTab=b.dataset.d;
+  $('#dsearch').placeholder = dTab==='all'?'Search all bookings...':'Filter your deliverables...';
+  renderRows(); }; });
+document.addEventListener('keydown',function(e){
+  if(e.target.matches('input,select,textarea')||!S) return;
+  if(!$('#p-log').classList.contains('on')) return;
+  if(e.key==='ArrowLeft'){ selDate=shift(selDate,-1); resetTimes(); renderAll(); }
+  if(e.key==='ArrowRight'&&selDate<S.today){ selDate=shift(selDate,1); resetTimes(); renderAll(); }
 });
-$('#pickBtn').onclick = e => {
-  if (selTask && e.target.classList.contains('x')){ selTask=null; selStage=null; renderRows(); paintBar(); return; }
-  $('#dsearch').focus();
-};
-$('#stageBtn').onclick = e => {
-  if (!selTask) return toast('Pick a deliverable first');
-  openStageMenu(e.currentTarget, effStage(), s => { selStage = s; paintBar(); });
-};
-$('#dur').oninput = () => paintBar();
-$('#dur').onkeydown = e => { if (e.key==='Enter') tryAdd(); };
-$('#desc').onkeydown = e => { if (e.key==='Enter') tryAdd(); };
-$('#addBtn').onclick = tryAdd;
-$$('.dtab').forEach(b => b.onclick = () => {
-  $$('.dtab').forEach(x=>x.classList.remove('on')); b.classList.add('on'); dTab=b.dataset.d;
-  $('#dsearch').placeholder = dTab==='all' ? 'Search all bookings…' : 'Filter your deliverables…';
-  renderRows();
-});
-document.addEventListener('keydown', e => {
-  if (e.target.matches('input,select,textarea')) return;
-  if (!$('#p-log').classList.contains('on') || !S) return;
-  if (e.key==='ArrowLeft'){ selDate = shift(selDate,-1); renderAll(); }
-  if (e.key==='ArrowRight' && selDate < S.today){ selDate = shift(selDate,1); renderAll(); }
-});
-$$('.rail a').forEach(a => a.onclick = e => {
+$$('.rail a').forEach(function(a){ a.onclick=function(e){
   e.preventDefault();
-  $$('.rail a').forEach(x=>x.classList.remove('on')); a.classList.add('on');
-  $$('.panel').forEach(p=>p.classList.remove('on'));
+  $$('.rail a').forEach(function(x){x.classList.remove('on');}); a.classList.add('on');
+  $$('.panel').forEach(function(p){p.classList.remove('on');});
   $('#p-'+a.dataset.go).classList.add('on');
-  if (a.dataset.go==='week') renderWeek();
+  if(a.dataset.go==='week') renderWeek();
+  if(a.dataset.go==='cal'){ renderCal();
+    const sc=$('#calScroll'); sc.scrollTop=Math.max(0,(8*60-DAY_START)/60*HH); }
   scrollTo(0,0);
-});
+}; });
+addEventListener('resize',function(){ if(S&&$('#p-cal').classList.contains('on')) renderCal(); });
 
-function renderAll(){ if (!S) return; paintBar(); renderRows(); renderTiles(); renderDays(); renderWeek(); }
+function renderAll(){ if(!S) return;
+  paintBar(); renderRows(); renderTiles(); renderDays(); renderWeek();
+  if($('#p-cal').classList.contains('on')) renderCal(); }
 
-sb.auth.onAuthStateChange((ev) => { if (ev==='SIGNED_IN' && !S) start(); });
-start();
+sb.auth.onAuthStateChange(function(ev){ if(ev==='SIGNED_IN'&&!S) start(); });
+start().then(function(){ if(S) resetTimes(), paintBar(); });
 </script>
 </body>
 </html>
