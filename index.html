@@ -295,6 +295,31 @@
   .tclock { font-variant-numeric:tabular-nums; font-weight:650; }
   .mini { font-size:11.5px; color:var(--muted); }
   @media (max-width:900px){ .two { grid-template-columns:1fr; } table { min-width:560px; } }
+  /* ---------- admin ---------- */
+  .atabs { display:flex; gap:4px; margin-bottom:12px; flex-wrap:wrap; }
+  .atab { border:1px solid var(--line); background:var(--raised); border-radius:8px; padding:7px 13px;
+    font-size:13.5px; color:var(--ink-2); }
+  .atab.on { background:var(--ink); color:#fff; border-color:var(--ink); font-weight:650; }
+  .adm td, .adm th { padding:7px 9px; font-size:13px; }
+  .adm select, .adm input { border:1px solid var(--line); border-radius:7px; padding:5px 7px;
+    font-size:12.5px; background:var(--surface); }
+  .adm input.rate { width:74px; text-align:right; font-variant-numeric:tabular-nums; }
+  .adm .sv2 { border:0; background:var(--booked); color:#fff; border-radius:7px; padding:5px 11px;
+    font-size:12.5px; font-weight:650; }
+  .adm .sv2.dirty { background:var(--crit); }
+  .chk { display:inline-flex; align-items:center; gap:5px; font-size:12.5px; color:var(--ink-2); }
+  .pillr { font-size:11px; font-weight:650; padding:1px 7px; border-radius:999px; background:var(--wash); color:var(--ink-2); }
+  .pillr.adm2 { background:#eaf2fd; color:#184f95; }
+  .pillr.warn2 { background:#fdf6e3; color:var(--warn-text); }
+  .caveat { background:#fdf6e3; border:1px solid #f6e4b0; color:var(--warn-text);
+    border-radius:9px; padding:11px 13px; font-size:13px; margin-bottom:12px; }
+  .editrow { background:var(--surface); }
+  .editrow td { padding:11px 9px; }
+  .egrid { display:grid; grid-template-columns:92px 92px 140px 1fr 1fr auto; gap:8px; align-items:end; }
+  .egrid label { font-size:11px; color:var(--muted); font-weight:650; display:block; margin-bottom:3px; }
+  .egrid input, .egrid select { width:100%; border:1px solid var(--line); border-radius:7px;
+    padding:7px 9px; font-size:13px; background:var(--raised); }
+  @media (max-width:900px){ .egrid { grid-template-columns:1fr 1fr; } }
   .note { font-size:12.5px; color:var(--muted); margin-top:10px; }
   .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(16px);
     background:var(--ink); color:#fff; padding:10px 16px; border-radius:9px; font-size:13.5px;
@@ -372,6 +397,7 @@
       <a data-go="week">&#9638; My week</a>
       <a data-go="dash">&#9683; Dashboard</a>
       <a data-go="rep">&#9639; Reports</a>
+      <a data-go="adm" id="navAdm" style="display:none">&#9881; Admin</a>
     </nav>
     <div class="foot"><span id="whoami"></span><br><button id="signout">Sign out</button></div>
   </aside>
@@ -563,6 +589,20 @@
       <div class="kpis" id="rKpis"></div>
       <div id="rBody"></div>
     </section>
+
+    <!-- ============ ADMIN ============ -->
+    <section class="panel" id="p-adm">
+      <h1 class="hd">Admin</h1>
+      <p class="sub">Everything here used to need a SQL query.</p>
+      <div class="atabs">
+        <button class="atab on" data-a="people">People</button>
+        <button class="atab" data-a="effort">Effort by booking</button>
+        <button class="atab" data-a="tags">Stages</button>
+        <button class="atab" data-a="rules">Reminders</button>
+        <button class="atab" data-a="groups">Groups</button>
+      </div>
+      <div id="admBody"></div>
+    </section>
   </main>
 </div>
 
@@ -658,6 +698,7 @@ async function start(){
   $('#gate').style.display='none'; $('#shell').classList.add('on');
   $('#whoami').textContent = S.me.name+' · '+S.me.role.replace('_',' ');
   buildTargets(); fillRepFilters();
+  if(S.me.is_admin) $('#navAdm').style.display='';
   await loadFavs();
   renderAll();
   restoreTimer();
@@ -1348,6 +1389,7 @@ $$('.rail a').forEach(function(a){ a.onclick=function(e){
   $('#p-'+a.dataset.go).classList.add('on');
   if(a.dataset.go==='week') renderWeek();
   if(a.dataset.go==='dash') runDash();
+  if(a.dataset.go==='adm') admLoad(false);
   if(a.dataset.go==='rep'){ if(!REP) runReport(); else renderReport(); }
   if(a.dataset.go==='cal'){ renderCal();
     const sc=$('#calScroll'); sc.scrollTop=Math.max(0,(8*60-DAY_START)/60*HH); }
@@ -1525,14 +1567,18 @@ function renderDetailed(rows){
     '<th>Note</th><th class="n">Time</th><th class="n">Hours</th>'+(a?'<th class="n">Amount</th>':'')+
     '</tr></thead><tbody>'+
     (rows.length?rows.map(function(e){
-      return '<tr><td style="white-space:nowrap">'+fmt(e.date)+'</td><td>'+esc(e.user)+'</td>'+
+      const cols=a?9:8;
+      const ed = String(e.id)===repEdit ? editRowHTML(e,cols) : '';
+      return '<tr data-e="'+e.id+'"><td style="white-space:nowrap">'+fmt(e.date)+'</td><td>'+esc(e.user)+'</td>'+
         '<td>'+esc(e.task)+(e.booked?'':' <b style="color:var(--unbooked)">·unbooked</b>')+'</td>'+
         '<td>'+esc(e.client||'internal')+'</td><td>'+esc(e.stage||'—')+'</td>'+
         '<td>'+esc(e.note||'')+'</td>'+
         '<td class="n" style="white-space:nowrap">'+(e.start?e.start+'–'+e.end:'—')+'</td>'+
-        '<td class="n">'+hm(e.mins)+'</td>'+(a?'<td class="n">'+money(e.amount).replace('HKD ','')+'</td>':'')+'</tr>';
+        '<td class="n">'+hm(e.mins)+'</td>'+(a?'<td class="n">'+money(e.amount).replace('HKD ','')+'</td>':'')+'</tr>'+ed;
     }).join(''):'<tr><td colspan="9">Nothing in range.</td></tr>')+
-    '</tbody></table></div><p class="note">'+rows.length+' entries. Export with the CSV button.</p>';
+    '</tbody></table></div><p class="note">'+rows.length+' entries. Export with the CSV button.'+
+    ((S.me.is_admin||S.me.is_manager)?' Click any row to edit or delete it.':'')+'</p>';
+  if(S.me.is_admin||S.me.is_manager) wireDetailedEdit();
 }
 function renderWeekly(rows){
   const from=$('#rFrom').value, to=$('#rTo').value;
@@ -1649,6 +1695,313 @@ async function runDash(){
 $('#dRefresh').onclick=runDash;
 $('#dRange').onchange=runDash;
 
+
+/* ================= ADMIN ================= */
+let aTab='people', STAFF=null, TAGS=null, RULES=null, GROUPS=null, EFFORT=null;
+const ROLES=['member','project_manager','team_manager','admin'];
+const roleLabel2=r=>({member:'Member',project_manager:'Project manager',
+  team_manager:'Team manager',admin:'Admin'}[r]||r);
+
+async function admLoad(force){
+  if(aTab==='people' && (!STAFF||force)){ const r=await sb.rpc('admin_staff');
+    if(r.error) return toast(friendly(r.error),true); STAFF=r.data; }
+  if(aTab==='tags' && (!TAGS||force)){ const r=await sb.rpc('admin_tags');
+    if(r.error) return toast(friendly(r.error),true); TAGS=r.data; }
+  if(aTab==='rules' && (!RULES||force)){ const r=await sb.rpc('admin_rules');
+    if(r.error) return toast(friendly(r.error),true); RULES=r.data;
+    if(!GROUPS){ const g=await sb.rpc('admin_groups'); if(!g.error) GROUPS=g.data; } }
+  if(aTab==='groups' && (!GROUPS||force)){ const r=await sb.rpc('admin_groups');
+    if(r.error) return toast(friendly(r.error),true); GROUPS=r.data; }
+  if(aTab==='effort' && (!EFFORT||force)){
+    const from=$('#rFrom')?$('#rFrom').value:shift(S.today,-90), to=$('#rTo')?$('#rTo').value:S.today;
+    const r=await sb.rpc('margin_by_booking',{p_from:from,p_to:to,p_min_hours:0.5});
+    if(r.error) return toast(friendly(r.error),true); EFFORT=r.data; }
+  admRender();
+}
+function admRender(){
+  const b=$('#admBody');
+  if(aTab==='people')  return admPeople(b);
+  if(aTab==='tags')    return admTags(b);
+  if(aTab==='rules')   return admRules(b);
+  if(aTab==='groups')  return admGroups(b);
+  if(aTab==='effort')  return admEffort(b);
+}
+
+/* ---- people ---- */
+let peopleFilter='pilot', peopleQ='';
+function admPeople(b){
+  if(!STAFF) { b.innerHTML='<div class="card2">Loading…</div>'; return; }
+  let list=STAFF.slice();
+  if(peopleFilter==='pilot')    list=list.filter(u=>u.pilot);
+  if(peopleFilter==='tracking') list=list.filter(u=>u.tracks_time);
+  if(peopleFilter==='norate')   list=list.filter(u=>!u.rate);
+  if(peopleFilter==='fallback') list=list.filter(u=>u.role_source==='roster_default');
+  if(peopleQ) list=list.filter(u=>(u.name+' '+u.email).toLowerCase().indexOf(peopleQ.toLowerCase())>=0);
+  b.innerHTML=
+   '<div class="filters"><div class="fld"><label>Show</label><select id="pFil">'+
+     [['pilot','Pilot group'],['tracking','Expected to track'],['norate','No rate set'],
+      ['fallback','Role is a fallback'],['all','Everyone']].map(function(o){
+       return '<option value="'+o[0]+'" '+(peopleFilter===o[0]?'selected':'')+'>'+o[1]+'</option>'; }).join('')+
+     '</select></div>'+
+     '<div class="fld"><label>Search</label><input id="pQ" value="'+esc(peopleQ)+'" placeholder="name or email"></div>'+
+     '<span class="spacer"></span><span class="mini">'+list.length+' of '+STAFF.length+'</span></div>'+
+   '<div class="tblwrap"><table class="adm"><thead><tr><th>Name</th><th>Role</th>'+
+   '<th class="n">Rate</th><th>Tracks</th><th>Pilot</th><th>Status</th><th class="n">Logged</th><th></th></tr></thead><tbody>'+
+   list.map(function(u){
+     return '<tr data-u="'+u.id+'"><td>'+esc(u.name)+
+       (u.role_source==='roster_default'?' <span class="pillr warn2">fallback</span>':'')+
+       (u.in_pacman?'':' <span class="pillr">not in PACMAN</span>')+
+       '<div class="mini">'+esc(u.email)+'</div></td>'+
+       '<td><select class="fRole">'+ROLES.map(function(r){
+          return '<option value="'+r+'" '+(u.role===r?'selected':'')+'>'+roleLabel2(r)+'</option>'; }).join('')+'</select></td>'+
+       '<td class="n"><input class="rate fRate" value="'+(u.rate!=null?Number(u.rate).toFixed(0):'')+'" placeholder="—"></td>'+
+       '<td><input type="checkbox" class="fTracks" '+(u.tracks_time?'checked':'')+'></td>'+
+       '<td><input type="checkbox" class="fPilot" '+(u.pilot?'checked':'')+'></td>'+
+       '<td><select class="fStatus"><option value="active" '+(u.status==='active'?'selected':'')+'>Active</option>'+
+         '<option value="inactive" '+(u.status==='inactive'?'selected':'')+'>Inactive</option></select></td>'+
+       '<td class="n">'+(u.logged_min?hm(u.logged_min):'—')+'</td>'+
+       '<td><button class="sv2">Save</button></td></tr>';
+   }).join('')+'</tbody></table></div>'+
+   '<p class="note">Changing a role sets <code>role_locked</code>, so the next PACMAN sync will not overwrite it. Rates write to the audit trail and are effective from today.</p>';
+
+  $('#pFil').onchange=function(){ peopleFilter=this.value; admPeople(b); };
+  $('#pQ').oninput=function(){ peopleQ=this.value; };
+  $('#pQ').onchange=function(){ peopleQ=this.value; admPeople(b); };
+  b.querySelectorAll('tbody tr').forEach(function(tr){
+    const mark=function(){ tr.querySelector('.sv2').classList.add('dirty'); };
+    tr.querySelectorAll('select,input').forEach(function(el){ el.onchange=mark; });
+    tr.querySelector('.sv2').onclick=async function(){
+      const id=tr.dataset.u, before=STAFF.filter(function(x){return x.id===id;})[0];
+      const role=tr.querySelector('.fRole').value;
+      const tracks=tr.querySelector('.fTracks').checked;
+      const pilot=tr.querySelector('.fPilot').checked;
+      const status=tr.querySelector('.fStatus').value;
+      const rateRaw=tr.querySelector('.fRate').value.trim();
+      const btn=tr.querySelector('.sv2'); btn.disabled=true;
+      const args={p_user:id};
+      if(role!==before.role) args.p_role=role;
+      if(tracks!==before.tracks_time) args.p_tracks=tracks;
+      if(pilot!==before.pilot) args.p_pilot=pilot;
+      if(status!==before.status) args.p_status=status;
+      let ok=true;
+      if(Object.keys(args).length>1){
+        const r=await sb.rpc('admin_set_user',args);
+        if(r.error){ toast(friendly(r.error),true); ok=false; }
+      }
+      if(ok && rateRaw!=='' && Number(rateRaw)!==Number(before.rate||-1)){
+        const r=await sb.rpc('admin_set_rate',{p_user:id,p_rate:Number(rateRaw)});
+        if(r.error){ toast(friendly(r.error),true); ok=false; }
+      }
+      btn.disabled=false;
+      if(ok){ btn.classList.remove('dirty'); toast(before.name+' updated'); await admLoad(true); }
+    };
+  });
+}
+
+/* ---- effort by booking (margin without the false precision) ---- */
+let showMargin=false;
+function admEffort(b){
+  if(!EFFORT){ b.innerHTML='<div class="card2">Loading…</div>'; return; }
+  const rows=EFFORT.rows||[], t=EFFORT.totals||{}, st=EFFORT.settled_totals||{};
+  const ub=t.hours?Math.round(t.hours_unbooked/t.hours*100):0;
+  b.innerHTML=
+   '<div class="caveat"><b>Read this before quoting a margin.</b> '+esc(EFFORT.caveat||'')+
+   ' Tracked time currently represents a fraction of actual labour, so cost is understated and margin flattering. '+
+   'The <b>unbooked share</b> below is reliable, because it is a ratio inside tracked time.</div>'+
+   '<div class="kpis">'+
+     kpi('BOOKINGS',rows.length,'with time in range')+
+     kpi('TRACKED',hm((t.hours||0)*60),'lifetime on these bookings')+
+     kpi('UNBOOKED',ub+'%',hm((t.hours_unbooked||0)*60)+' not on a sold line item')+
+     kpi('SETTLED',st.bookings||0,'finished + started in range')+
+   '</div>'+
+   '<div class="toolbar"><label class="chk"><input type="checkbox" id="mTog" '+(showMargin?'checked':'')+
+     '> Show revenue and margin anyway</label><span class="spacer"></span>'+
+     '<span class="mini">Sorted by unbooked share</span></div>'+
+   '<div class="tblwrap"><table class="adm"><thead><tr><th>Booking</th><th>Client</th>'+
+   '<th class="n">Hours</th><th class="n">Unbooked</th><th style="width:120px">Unbooked share</th>'+
+   (showMargin?'<th class="n">Net revenue</th><th class="n">Cost</th><th class="n">Margin</th><th>Coverage</th>':'')+
+   '</tr></thead><tbody>'+
+   (rows.length?rows.slice().sort(function(x,y){
+      const a=x.hours_total?x.hours_unbooked/x.hours_total:0, c=y.hours_total?y.hours_unbooked/y.hours_total:0;
+      return c-a; }).slice(0,120).map(function(r){
+     const pct=r.hours_total?Math.round(r.hours_unbooked/r.hours_total*100):0;
+     return '<tr><td>'+esc(r.io||r.project)+'</td><td>'+esc(r.client||'internal')+'</td>'+
+       '<td class="n">'+hm(r.hours_total*60)+'</td>'+
+       '<td class="n">'+(r.hours_unbooked?hm(r.hours_unbooked*60):'—')+'</td>'+
+       '<td><div class="meter" style="margin:0"><i style="width:'+pct+'%;background:'+
+         (pct>25?'var(--unbooked)':'var(--booked)')+'"></i></div><div class="mini" style="margin-top:3px">'+pct+'%</div></td>'+
+       (showMargin?'<td class="n">'+(r.net_revenue?Math.round(r.net_revenue).toLocaleString():'—')+'</td>'+
+         '<td class="n">'+Math.round(r.cost).toLocaleString()+'</td>'+
+         '<td class="n">'+(r.net_revenue?Math.round(r.margin).toLocaleString()+' ('+(r.margin_pct!=null?r.margin_pct+'%':'—')+')':'—')+'</td>'+
+         '<td>'+(r.settled&&r.started_in_window?'<span class="pillr adm2">comparable</span>'
+                :'<span class="pillr warn2">partial</span>')+'</td>':'')+
+       '</tr>';
+   }).join(''):'<tr><td colspan="9">Nothing in range.</td></tr>')+
+   '</tbody></table></div>'+
+   '<p class="note">Cost basis: '+esc(EFFORT.basis||'')+' Rows marked <b>partial</b> have revenue for the whole booking but only part of its time.</p>';
+  $('#mTog').onchange=function(){ showMargin=this.checked; admEffort(b); };
+}
+
+/* ---- tags ---- */
+function admTags(b){
+  if(!TAGS){ b.innerHTML='<div class="card2">Loading…</div>'; return; }
+  b.innerHTML='<div class="tblwrap"><table class="adm"><thead><tr><th>Stage</th><th>Kind</th>'+
+   '<th class="n">Order</th><th>Repeatable</th><th>Archived</th><th class="n">Used</th><th></th></tr></thead><tbody>'+
+   TAGS.map(function(t){
+     return '<tr data-t="'+t.id+'"><td><input class="tName" value="'+esc(t.name)+'" style="width:210px"></td>'+
+      '<td><select class="tKind"><option value="sequence" '+(t.kind==='sequence'?'selected':'')+'>Sequence</option>'+
+        '<option value="other" '+(t.kind!=='sequence'?'selected':'')+'>Other</option></select></td>'+
+      '<td class="n"><input class="rate tSort" value="'+t.sort_order+'"></td>'+
+      '<td><input type="checkbox" class="tRep" '+(t.repeatable?'checked':'')+'></td>'+
+      '<td><input type="checkbox" class="tArc" '+(t.archived?'checked':'')+'></td>'+
+      '<td class="n">'+t.used+'</td><td><button class="sv2">Save</button></td></tr>'; }).join('')+
+   '<tr data-t=""><td><input class="tName" placeholder="New stage name" style="width:210px"></td>'+
+   '<td><select class="tKind"><option value="sequence">Sequence</option><option value="other">Other</option></select></td>'+
+   '<td class="n"><input class="rate tSort" value="99"></td>'+
+   '<td><input type="checkbox" class="tRep"></td><td><input type="checkbox" class="tArc"></td>'+
+   '<td class="n">—</td><td><button class="sv2">Add</button></td></tr>'+
+   '</tbody></table></div><p class="note">Order drives the next-stage suggestion when someone logs time. '+
+   'Archiving keeps history intact and removes it from the picker. A stage that is already used cannot be deleted, only archived.</p>';
+  b.querySelectorAll('tbody tr').forEach(function(tr){
+    tr.querySelector('.sv2').onclick=async function(){
+      const r=await sb.rpc('admin_tag_save',{
+        p_id:tr.dataset.t||null, p_name:tr.querySelector('.tName').value,
+        p_kind:tr.querySelector('.tKind').value, p_sort:+tr.querySelector('.tSort').value,
+        p_repeatable:tr.querySelector('.tRep').checked, p_archived:tr.querySelector('.tArc').checked});
+      if(r.error) return toast(friendly(r.error),true);
+      toast('Saved'); await admLoad(true);
+      const b2=await sb.rpc('bootstrap',{p_days:60});   // stages changed; refresh the picker
+      if(!b2.error && b2.data && !b2.data.error){ S.stages=b2.data.stages; renderAll(); }
+    };
+  });
+}
+
+/* ---- reminder rules ---- */
+function admRules(b){
+  if(!RULES){ b.innerHTML='<div class="card2">Loading…</div>'; return; }
+  const gopts=(GROUPS||[]).map(function(g){ return '<option value="'+g.id+'">'+esc(g.name)+'</option>'; }).join('');
+  const row=function(r){
+    const id=r?r.id:'';
+    return '<tr data-r="'+id+'">'+
+      '<td><select class="rEnabled"><option value="1" '+(!r||r.enabled?'selected':'')+'>On</option>'+
+        '<option value="0" '+(r&&!r.enabled?'selected':'')+'>Off</option></select></td>'+
+      '<td><select class="rCmp"><option value="less" '+(!r||r.comparator==='less'?'selected':'')+'>tracks less than</option>'+
+        '<option value="more" '+(r&&r.comparator==='more'?'selected':'')+'>tracks more than</option></select></td>'+
+      '<td class="n"><input class="rate rThr" value="'+(r?Math.round(r.threshold_min/60*10)/10:10)+'"> h</td>'+
+      '<td><select class="rPer"><option value="weekly" '+(!r||r.period==='weekly'?'selected':'')+'>per week</option>'+
+        '<option value="daily" '+(r&&r.period==='daily'?'selected':'')+'>per day</option></select></td>'+
+      '<td><select class="rGrp"><option value="">Everyone tracking</option>'+gopts+'</select></td>'+
+      '<td><select class="rNot"><option value="self" '+(!r||r.notify==='self'?'selected':'')+'>tell them</option>'+
+        '<option value="managers" '+(r&&r.notify==='managers'?'selected':'')+'>tell managers</option></select></td>'+
+      '<td><button class="sv2">'+(r?'Save':'Add')+'</button>'+
+        (r?' <button class="cn rDry" style="padding:5px 9px;font-size:12.5px">Test</button>'+
+            ' <button class="del rDel" style="padding:5px 9px;font-size:12.5px">Delete</button>':'')+'</td></tr>';
+  };
+  b.innerHTML='<div class="caveat"><b>Rules are stored but nothing sends yet.</b> Delivery needs either a '+
+   'time-driven Apps Script trigger in PACMAN (which already holds Gmail send permission) or an email provider. '+
+   'Use <b>Test</b> to see exactly who a rule would notify right now.</div>'+
+   '<div class="tblwrap"><table class="adm"><thead><tr><th>State</th><th>Condition</th><th class="n">Threshold</th>'+
+   '<th>Period</th><th>Applies to</th><th>Notify</th><th></th></tr></thead><tbody>'+
+   RULES.map(row).join('')+row(null)+'</tbody></table></div>'+
+   '<div id="dryOut"></div>'+
+   '<p class="note">On the 2026 evidence a daily rule would fire at almost everyone, so weekly is the sensible default.</p>';
+  b.querySelectorAll('tbody tr').forEach(function(tr){
+    const g=tr.querySelector('.rGrp'); const rid=tr.dataset.r;
+    if(rid){ const rr=RULES.filter(function(x){return x.id===rid;})[0]; if(rr&&rr.group_id) g.value=rr.group_id; }
+    tr.querySelector('.sv2').onclick=async function(){
+      const r=await sb.rpc('admin_rule_save',{
+        p_id:rid||null, p_comparator:tr.querySelector('.rCmp').value,
+        p_threshold_min:Math.round(parseFloat(tr.querySelector('.rThr').value||'0')*60),
+        p_period:tr.querySelector('.rPer').value, p_days:[1,2,3,4,5],
+        p_notify:tr.querySelector('.rNot').value, p_group:g.value||null,
+        p_enabled:tr.querySelector('.rEnabled').value==='1', p_role:null});
+      if(r.error) return toast(friendly(r.error),true);
+      toast('Rule saved'); await admLoad(true);
+    };
+    if(tr.querySelector('.rDel')) tr.querySelector('.rDel').onclick=async function(){
+      const r=await sb.rpc('admin_rule_delete',{p_id:rid});
+      if(r.error) return toast(friendly(r.error),true); toast('Rule deleted'); await admLoad(true); };
+    if(tr.querySelector('.rDry')) tr.querySelector('.rDry').onclick=async function(){
+      const r=await sb.rpc('admin_rule_dryrun',{p_id:rid});
+      if(r.error) return toast(friendly(r.error),true);
+      const d=r.data;
+      $('#dryOut').innerHTML='<div class="card2" style="margin-top:12px"><h3>Would notify '+
+        d.would_notify+' '+(d.would_notify===1?'person':'people')+' right now</h3>'+
+        (d.who&&d.who.length?'<div class="tblwrap"><table class="adm"><thead><tr><th>Person</th>'+
+          '<th class="n">Logged this '+(d.period==='weekly'?'week':'day')+'</th></tr></thead><tbody>'+
+          d.who.map(function(w){ return '<tr><td>'+esc(w.name)+'</td><td class="n">'+hm(w.minutes)+'</td></tr>'; }).join('')+
+          '</tbody></table></div>':'<p class="note" style="margin:0"><b style="color:var(--good-text)">Nobody — everyone is above the threshold.</b></p>')+
+        '</div>'; };
+  });
+}
+
+/* ---- groups ---- */
+function admGroups(b){
+  if(!GROUPS){ b.innerHTML='<div class="card2">Loading…</div>'; return; }
+  b.innerHTML='<div class="tblwrap"><table class="adm"><thead><tr><th>Group</th><th class="n">Members</th>'+
+   '<th>Team managers</th></tr></thead><tbody>'+
+   GROUPS.map(function(g){ return '<tr><td>'+esc(g.name)+'</td><td class="n">'+g.members+'</td>'+
+     '<td>'+(g.managers?esc(g.managers):'<span class="mini">none assigned</span>')+'</td></tr>'; }).join('')+
+   '</tbody></table></div><p class="note">Groups came across from Clockify. Reporting scope comes from '+
+   '<code>manager_scope</code>, which is derived from PACMAN page ownership — not from these groups.</p>';
+}
+
+$$('.atab').forEach(function(b){ b.onclick=function(){
+  $$('.atab').forEach(function(x){x.classList.remove('on');}); b.classList.add('on');
+  aTab=b.dataset.a; admLoad(false); }; });
+
+/* ================= edit anyone's entry, from the Detailed report ================= */
+let repEdit=null;
+function wireDetailedEdit(){
+  $$('#rBody tbody tr[data-e]').forEach(function(tr){
+    tr.style.cursor='pointer';
+    tr.onclick=function(ev){
+      if(ev.target.closest('.editrow')) return;
+      repEdit = repEdit===tr.dataset.e ? null : tr.dataset.e;
+      renderReport();
+    };
+  });
+  const host=$('#rBody tr.editrow'); if(!host) return;
+  const e=(REP.rows||[]).filter(function(x){return String(x.id)===repEdit;})[0]; if(!e) return;
+  $('#eSave').onclick=async function(){
+    const a=parseTime($('#eA').value), b2=parseTime($('#eB').value);
+    const both=$('#eA').value.trim()&&$('#eB').value.trim();
+    const patch={ entry_date:$('#eD').value, stage_tag_id:$('#eS').value||null,
+                  description:$('#eN').value.trim()||null, edited_by:S.me.id };
+    if(both){
+      if(a===null||b2===null) return toast('Times not understood');
+      let mins=b2-a; if(mins<=0) mins+=1440;
+      patch.duration_sec=mins*60;
+      patch.started_at=$('#eD').value+'T'+t2s(a)+':00+08:00';
+      patch.ended_at=new Date(new Date(patch.started_at).getTime()+mins*60000).toISOString();
+    }
+    const r=await sb.from('time_entries').update(patch).eq('id',e.id);
+    if(r.error) return toast(friendly(r.error),true);
+    repEdit=null; toast('Saved — '+e.user+'’s entry'); runReport();
+  };
+  $('#eCancel').onclick=function(){ repEdit=null; renderReport(); };
+  $('#eDel').onclick=async function(){
+    const r=await sb.from('time_entries').delete().eq('id',e.id);
+    if(r.error) return toast(friendly(r.error),true);
+    repEdit=null; toast('Entry deleted'); runReport();
+  };
+}
+function editRowHTML(e,cols){
+  const days=Array.from({length:60},function(_,i){return shift(S.today,-i);});
+  return '<tr class="editrow"><td colspan="'+cols+'"><div class="egrid">'+
+    '<div><label>Start</label><input id="eA" value="'+(e.start||'')+'" placeholder="—"></div>'+
+    '<div><label>Finish</label><input id="eB" value="'+(e.end||'')+'" placeholder="—"></div>'+
+    '<div><label>Day</label><select id="eD">'+days.map(function(d){
+      return '<option value="'+d+'" '+(d===e.date?'selected':'')+'>'+fmt(d)+'</option>'; }).join('')+'</select></div>'+
+    '<div><label>Stage</label><select id="eS"><option value="">'+(e.booked?'— choose —':'None')+'</option>'+
+      S.stages.map(function(s){ return '<option value="'+s.id+'" '+(s.id===e.stage_id?'selected':'')+'>'+esc(s.name)+'</option>'; }).join('')+
+    '</select></div>'+
+    '<div><label>Note</label><input id="eN" value="'+esc(e.note)+'"></div>'+
+    '<div class="sbtns"><button class="sv" id="eSave">Save</button>'+
+      '<button class="cn" id="eCancel">Cancel</button><button class="del" id="eDel">Delete</button></div>'+
+    '</div><p class="note" style="margin:9px 0 0">Editing <b>'+esc(e.user)+'</b>’s entry. '+
+    'Allowed because you are an admin or their manager.</p></td></tr>';
+}
 function renderAll(){ if(!S) return;
   paintBar(); renderRows(); renderTiles(); renderDays(); renderWeek();
   if($('#p-cal').classList.contains('on')) renderCal(); }
