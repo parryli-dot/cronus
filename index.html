@@ -170,6 +170,7 @@
   .e .t2 { font-size:12.5px; color:var(--muted); margin-top:2px; }
   .when { font-size:13px; color:var(--ink-2); font-variant-numeric:tabular-nums; white-space:nowrap; }
   .when.none { color:var(--muted); font-style:italic; }
+  .when .nd { font-size:10px; color:var(--muted); vertical-align:super; margin-left:2px; }
   .e .d { font-variant-numeric:tabular-nums; font-weight:650; min-width:52px; text-align:right; }
   .ico { border:1px solid var(--line); background:var(--surface); border-radius:7px; width:30px;height:30px;
     display:grid;place-items:center; color:var(--ink-2); font-size:14px; }
@@ -502,7 +503,7 @@
         <div class="stepper">
           <button id="wPrev">&lsaquo;</button><span class="lab" id="wLab">&mdash;</span><button id="wNext">&rsaquo;</button>
         </div>
-        <button class="quick" id="copyLast">&#10683; Copy last week&rsquo;s rows</button>
+        <button class="quick" id="copyLast">&#10697; Copy last week&rsquo;s rows</button>
         <span class="spacer"></span><span class="note" style="margin:0" id="wkSaved"></span>
       </div>
       <div class="tblwrap">
@@ -664,9 +665,39 @@ function parseTime(raw){
   if(h>23||mi>59) return null;
   return h*60+mi;
 }
-const t2s = t => t==null ? '' : pad(Math.floor(t/60))+':'+pad(t%60);
+const t2s = t => t==null ? '' : pad(Math.floor(t/60)%24)+':'+pad(t%60);
 const snap = t => Math.round(t/SNAP)*SNAP;
 const startMins = e => e.start ? parseTime(e.start) : null;
+// Minutes from start a to finish b. A finish earlier than the start means the work ran past
+// midnight and finished the next day (23:00 -> 01:00 = 120). b may exceed 1440 when it came from a duration.
+const spanMins = (a,b) => (a==null||b==null) ? null : (b>=a ? b-a : b+1440-a);
+const crossesDay = (a,b) => a!=null && b!=null && b<a;
+const BACKFILL_DAYS = 14;   // matches v_time_quality: later than this is flagged, never blocked
+const daysBack = d => Math.round((toD(S.today)-toD(d))/864e5);
+// timed entries touching `date`, as [a,b) minutes from that day's midnight — includes yesterday's entries that ran past midnight
+function spansOn(date){
+  const out=[], prev=shift(date,-1);
+  ENTRIES.forEach(function(e){
+    if(!(e.start&&e.end)) return;
+    const a=parseTime(e.start), b=parseTime(e.end); if(a===null||b===null) return;
+    const len=spanMins(a,b);
+    if(e.date===date) out.push({e:e,a:a,b:a+len});
+    else if(e.date===prev && a+len>1440) out.push({e:e,a:a-1440,b:a+len-1440});
+  });
+  return out;
+}
+function overlapsOn(date,a,mins,skipId){
+  if(a==null||!mins) return [];
+  return spansOn(date).filter(function(s){ return String(s.e.id)!==String(skipId) && s.a<a+mins && a<s.b; });
+}
+function overlapText(hits){
+  const s=hits[0], t=TASK[s.e.task_id]||{name:'another entry'};
+  return 'Overlaps <b>'+s.e.start+'&ndash;'+s.e.end+'</b> ('+esc(t.name)+')'+(hits.length>1?' and '+(hits.length-1)+' more':'')+'.';
+}
+function backfillText(date){
+  const n=daysBack(date);
+  return n>BACKFILL_DAYS ? '<b>'+fmt(date)+'</b> is '+n+' days back. Late entries are flagged in the quality report.' : '';
+}
 
 /* ---------- auth ---------- */
 $('#signin').onclick = async function(){
@@ -734,8 +765,9 @@ document.addEventListener('click',function(e){
 /* ---------- entry bar ---------- */
 function lastFriday(){ let d=shift(S.today,-1); while(toD(d).getDay()!==5) d=shift(d,-1); return d; }
 function nextFreeStart(date){
-  const ends = ENTRIES.filter(function(e){ return e.date===date && e.end; })
-                      .map(function(e){ return parseTime(e.end); });
+  const ends = ENTRIES.filter(function(e){ return e.date===date && e.start && e.end; })
+                      .map(function(e){ const a=parseTime(e.start), b=parseTime(e.end); return crossesDay(a,b) ? b+1440 : b; })
+                      .filter(function(b){ return b!==null; });
   return ends.length ? Math.min(Math.max.apply(null,ends), DAY_END-60) : 9*60+30;
 }
 function currentTimes(){
@@ -768,15 +800,15 @@ function paintBar(){
   const tt=currentTimes();
   $('#tStart').classList.toggle('bad', $('#tStart').value.trim()!=='' && tt.a===null);
   $('#tEnd').classList.toggle('bad', $('#tEnd').value.trim()!=='' && tt.b===null);
-  const mins = (tt.a!==null&&tt.b!==null) ? tt.b-tt.a : null;
+  const mins = spanMins(tt.a,tt.b);
   const out=$('#durOut');
   out.className='dur'+(mins!==null&&mins>720?' warn':'');
-  out.textContent = mins===null ? '—' : (mins<=0 ? 'ends before it starts' : hm(mins));
+  out.textContent = mins===null ? '—' : (mins<=0 ? 'no time in between' : hm(mins)+(crossesDay(tt.a,tt.b)?' · ends next day':''));
   $('#addBtn').disabled = !(selTask && mins>0 && !(stageRequired()&&!sid));
   $('#calSel').textContent = selTask ? ('Dragging will log: '+TASK[selTask].name) : 'Pick a deliverable first — drag then fills it in.';
-  paintGuard(mins);
+  paintGuard(mins,tt.a);
 }
-function paintGuard(mins){
+function paintGuard(mins,a){
   const g=$('#guard'); g.className='guard'; g.innerHTML='';
   if(pendingBig){
     g.className='guard on hard';
@@ -786,12 +818,18 @@ function paintGuard(mins){
     $('#gNo').onclick=function(){ pendingBig=null; paintBar(); $('#tEnd').focus(); };
     return;
   }
-  if(mins===null) return;
-  const day=totalFor(selDate)+(mins>0?mins:0);
-  if(mins>720){ g.className='guard on';
-    g.innerHTML='<span>That is <b>'+hm(mins)+'</b> in a single entry &mdash; just confirming the day is right. It will save.</span>'; }
-  else if(day>720){ g.className='guard on';
-    g.innerHTML='<span><b>'+fmt(selDate)+'</b> would reach <b>'+hm(day)+'</b>. Still saves.</span>'; }
+  // Soft hints only — nothing here blocks a save (see PRD 6.3: no hard limits without a manager sign-off flow)
+  const hints=[];
+  const late=backfillText(selDate); if(late) hints.push(late);
+  if(mins!==null && mins>0){
+    const day=totalFor(selDate)+mins;
+    if(mins>720) hints.push('That is <b>'+hm(mins)+'</b> in a single entry &mdash; just confirming the day is right.');
+    else if(day>720) hints.push('<b>'+fmt(selDate)+'</b> would reach <b>'+hm(day)+'</b>.');
+    const ov=overlapsOn(selDate,a,mins,null); if(ov.length) hints.push(overlapText(ov));
+  }
+  if(!hints.length) return;
+  g.className='guard on';
+  g.innerHTML=hints.map(function(h){ return '<span>'+h+'</span>'; }).join('')+'<span style="color:var(--muted)">Still saves.</span>';
 }
 function resetTimes(){
   const a=nextFreeStart(selDate);
@@ -896,6 +934,7 @@ function friendly(err){
   if(m.indexOf('date_too_old')>=0) return 'That date is too far back.';
   if(m.indexOf('end_before_start')>=0) return 'The finish time must be after the start time.';
   if(m.indexOf('date_mismatch')>=0) return 'Start time falls on a different day.';
+  if(m.indexOf('max_16h')>=0) return 'A single entry cannot be longer than 16 hours.';
   if(m.indexOf('duration_sec')>=0) return 'An entry must be between 1 minute and 24 hours.';
   if(m.indexOf('pm_only')>=0) return 'Only a project manager or admin can add extra items to a booking.';
   if(m.indexOf('name_required')>=0) return 'Give it a name.';
@@ -903,12 +942,14 @@ function friendly(err){
   return err.message||'Could not save.';
 }
 const stamp = (date,t) => t==null ? null : date+'T'+t2s(t)+':00+08:00';
+// the finish timestamp lands on the next calendar day when the entry ran past midnight; entry_date stays the start day
+const endStamp = (date,a,b) => stamp(crossesDay(a,b) ? shift(date,1) : date, b);
 async function insertEntry(row){
   const a=row.start?parseTime(row.start):null, b=row.end?parseTime(row.end):null;
   const r=await sb.from('time_entries').insert({
     user_id:S.me.id, project_id:row.project_id, task_id:row.task_id,
     entry_date:row.date, duration_sec:row.mins*60,
-    started_at:stamp(row.date,a), ended_at:stamp(row.date,b),
+    started_at:stamp(row.date,a), ended_at:endStamp(row.date,a,b),
     stage_tag_id:row.stage||null, description:row.note||null,
     source:row.source||'manual', created_by:S.me.id
   }).select('id,entry_date,duration_sec,started_at,ended_at,stage_tag_id,description,source,locked').single();
@@ -926,7 +967,7 @@ async function patchEntry(e,patch){
   const a=e.start?parseTime(e.start):null, b=e.end?parseTime(e.end):null;
   const r=await sb.from('time_entries').update({
     entry_date:e.date, duration_sec:e.mins*60,
-    started_at:stamp(e.date,a), ended_at:stamp(e.date,b),
+    started_at:stamp(e.date,a), ended_at:endStamp(e.date,a,b),
     stage_tag_id:e.stage||null, description:e.note||null, edited_by:S.me.id
   }).eq('id',e.id);
   if(r.error){ Object.assign(e,before); renderAll(); toast(friendly(r.error),true); return false; }
@@ -943,8 +984,8 @@ function tryAdd(){
   if(!selTask) return toast('Pick a deliverable first');
   if(tt.a===null) { $('#tStart').focus(); return toast('Start time not understood — try 9:30 or 930'); }
   if(tt.b===null) { $('#tEnd').focus(); return toast('Finish not understood — a time like 11:00, or a length like 1.5'); }
-  const mins=tt.b-tt.a;
-  if(mins<=0) return toast('The finish time must be after the start time');
+  const mins=spanMins(tt.a,tt.b);   // finish earlier than start = finished the next day
+  if(mins<=0) return toast('Start and finish are the same time');
   if(stageRequired()&&!effStage()) return toast('This is booked work — it needs a stage');
   const row={ id:tempId(), task_id:selTask, project_id:TASK[selTask].project_id, date:selDate,
               mins:mins, start:t2s(tt.a), end:t2s(tt.b), stage:effStage(),
@@ -955,8 +996,8 @@ function tryAdd(){
 async function commit(row){
   ENTRIES.push(row);
   $('#desc').value=''; selStage=null;
-  const a=parseTime(row.end);
-  $('#tStart').value=t2s(a); $('#tEnd').value=t2s(Math.min(a+60,DAY_END));
+  if(crossesDay(parseTime(row.start),parseTime(row.end))) resetTimes();   // next slot is on another day — start afresh
+  else { const a=parseTime(row.end); $('#tStart').value=t2s(a); $('#tEnd').value=t2s(Math.min(a+60,DAY_END)); }
   renderAll();
   const saved=await insertEntry(row);
   if(saved){ Object.assign(row,saved); delete row._p;
@@ -1010,7 +1051,8 @@ function renderDays(){
 function entryHTML(e){
   const t=TASK[e.task_id]||{name:'(unknown deliverable)',booked:true,client:''};
   const needs=t.booked&&!e.stage, sn=stageName(e.stage);
-  const when = e.start&&e.end ? '<span class="when">'+e.start+'–'+e.end+'</span>'
+  const when = e.start&&e.end ? '<span class="when">'+e.start+'–'+e.end+
+                                (crossesDay(parseTime(e.start),parseTime(e.end))?'<span class="nd" title="Finished the next day">+1</span>':'')+'</span>'
                               : '<span class="when none">no time set</span>';
   return '<div class="e '+(e._p?'pending':'')+'">'+
     '<span class="bar '+(t.booked?'':'ub')+'"></span>'+
@@ -1021,20 +1063,21 @@ function entryHTML(e){
              :'<span class="tagchip" style="color:var(--muted)">&mdash;</span>')+
     when+'<span class="d">'+hm(e.mins)+'</span>'+
     '<span style="display:flex;gap:6px">'+
-    '<button class="ico" title="Copy onto '+fmt(selDate)+'" data-dup="'+e.id+'">&#10683;</button>'+
-    '<button class="ico" title="Edit" data-edit="'+e.id+'">&#9998;</button></span>'+
+    '<button class="ico" title="Duplicate this entry onto '+fmt(selDate)+'" aria-label="Duplicate" data-dup="'+e.id+'">&#10697;</button>'+
+    '<button class="ico" title="Edit or delete" aria-label="Edit" data-edit="'+e.id+'">&#9998;</button></span>'+
   '</div>'+(openEdit===String(e.id)?sheetHTML(e):'');
 }
 function sheetHTML(e){
   const t=TASK[e.task_id]||{booked:true};
-  const days=Array.from({length:21},function(_,i){return shift(S.today,-i);});
   const prev=ENTRIES.filter(function(x){return x.task_id===e.task_id&&x.id!==e.id&&x.note;})
                     .sort(function(a,b){return a.id<b.id?1:-1;})[0];
+  // Day is a real date field: it always shows the entry's own date (the old 21-day list silently fell back to today
+  // for anything older) and reaches back as far as the main screen does.
   return '<div class="sheet"><div class="sgrid">'+
     '<div><label>Start</label><input id="sA" value="'+(e.start||'')+'" placeholder="—"></div>'+
     '<div><label>Finish</label><input id="sB" value="'+(e.end||'')+'" placeholder="—"></div>'+
-    '<div><label>Day</label><select id="sDate">'+days.map(function(d){
-      return '<option value="'+d+'" '+(d===e.date?'selected':'')+'>'+fmt(d)+(d===S.today?' (today)':'')+'</option>'; }).join('')+'</select></div>'+
+    '<div><label>Day <span id="sDow" style="font-weight:400">'+fmt(e.date)+(e.date===S.today?' (today)':'')+'</span></label>'+
+      '<input type="date" id="sDate" value="'+e.date+'" min="2024-01-01" max="'+S.today+'"></div>'+
     '<div><label>Stage'+(t.booked?' &mdash; required':'')+'</label><select id="sS">'+
       '<option value="">'+(t.booked?'&mdash; choose &mdash;':'None')+'</option>'+
       S.stages.map(function(s){ return '<option value="'+s.id+'" '+(s.id===e.stage?'selected':'')+'>'+esc(s.name)+'</option>'; }).join('')+
@@ -1042,27 +1085,54 @@ function sheetHTML(e){
     '<div><label>Note</label><input id="sN" value="'+esc(e.note)+'" placeholder="'+esc(prev?prev.note:'optional')+'"></div>'+
     '<div class="sbtns"><button class="sv" id="sSave">Save</button><button class="cn" id="sCancel">Cancel</button>'+
     '<button class="del" id="sDel">Delete</button></div></div>'+
-    '<p class="note" style="margin:9px 0 0">Leave both times blank to keep it as a plain duration of '+hm(e.mins)+'.</p></div>';
+    '<p class="note" id="sHint" style="margin:9px 0 0"></p></div>';
+}
+// live hint line under the sheet: what the save will do, plus the same soft warnings as the entry bar
+function sheetHint(e){
+  const el=$('#sHint'); if(!el) return;
+  const d=$('#sDate').value, a=parseTime($('#sA').value), b=parseTime($('#sB').value);
+  const bothBlank=!$('#sA').value.trim() && !$('#sB').value.trim();
+  const mins = bothBlank ? e.mins : spanMins(a,b);
+  const dow=$('#sDow'); if(dow) dow.textContent = d ? fmt(d)+(d===S.today?' (today)':'') : '';
+  const parts=[];
+  if(!d) parts.push('Pick a day.');
+  else if(d!==e.date) parts.push('Moves this entry from <b>'+fmt(e.date)+'</b> to <b>'+fmt(d)+'</b>.');
+  if(bothBlank) parts.push('Leave both times blank to keep it as a plain duration of '+hm(e.mins)+'.');
+  else if(a===null||b===null) parts.push('Times like 9:30 or 930.');
+  else if(mins<=0) parts.push('Start and finish are the same time.');
+  else if(crossesDay(a,b)) parts.push('Finishes the next day &mdash; '+hm(mins)+', counted on '+fmt(d||e.date)+'.');
+  if(d){
+    const late=backfillText(d); if(late) parts.push(late);
+    if(!bothBlank && mins>0){ const ov=overlapsOn(d,a,mins,e.id); if(ov.length) parts.push(overlapText(ov)); }
+  }
+  el.innerHTML=parts.join(' ');
 }
 function wireSheet(){
   const e=ENTRIES.filter(function(x){return String(x.id)===openEdit;})[0]; if(!e) return;
+  ['sA','sB','sDate'].forEach(function(id){ const x=$('#'+id); x.oninput=x.onchange=function(){ sheetHint(e); }; });
+  sheetHint(e);
   $('#sCancel').onclick=function(){ openEdit=null; renderDays(); };
   $('#sDel').onclick=async function(){ openEdit=null; await removeEntry(e); toast('Entry deleted'); };
   $('#sSave').onclick=async function(){
     const a=parseTime($('#sA').value), b=parseTime($('#sB').value);
     const t=TASK[e.task_id]||{};
     if(t.booked&&!$('#sS').value) return toast('Booked work needs a stage');
-    let patch={ date:$('#sDate').value, stage:$('#sS').value||null, note:$('#sN').value.trim() };
+    const day=$('#sDate').value;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(day)) return toast('Pick a day');
+    if(day>S.today) return toast('Time cannot be logged into the future');
+    let patch={ date:day, stage:$('#sS').value||null, note:$('#sN').value.trim() };
     const bothBlank = !$('#sA').value.trim() && !$('#sB').value.trim();
     if(bothBlank){ patch.start=null; patch.end=null; }
     else {
       if(a===null) return toast('Start time not understood');
       if(b===null) return toast('Finish time not understood');
-      if(b<=a) return toast('The finish time must be after the start time');
-      patch.start=t2s(a); patch.end=t2s(b); patch.mins=b-a;
+      const mins=spanMins(a,b);   // finish earlier than start = finished the next day
+      if(mins<=0) return toast('Start and finish are the same time');
+      patch.start=t2s(a); patch.end=t2s(b); patch.mins=mins;
     }
+    const moved = day!==e.date;
     openEdit=null;
-    if(await patchEntry(e,patch)) toast('Saved');
+    if(await patchEntry(e,patch)) toast(moved?'Saved — moved to '+fmt(day):'Saved');
   };
 }
 
@@ -1144,7 +1214,7 @@ function renderCal(){
     const col=grid.querySelector('.daycol[data-date="'+d+'"]');
     const timed=ENTRIES.filter(function(e){ return e.date===d && e.start && e.end; });
     laneOut(timed).forEach(function(e){
-      const s=startMins(e), top=(s-DAY_START)/60*HH, h=Math.max(16,e.mins/60*HH);
+      const s=startMins(e), top=(s-DAY_START)/60*HH, h=Math.max(16,(Math.min(s+e.mins,DAY_END)-s)/60*HH);   // clipped at the grid's end for entries that run past midnight
       const t=TASK[e.task_id]||{name:'?',booked:true};
       const w=100/e._lanes, left=e._lane*w;
       const b=document.createElement('div');
@@ -1251,8 +1321,9 @@ function paintGhost(){
 function startBlockDrag(ev,blk,col,resize){
   const e=ENTRIES.filter(function(x){return String(x.id)===blk.dataset.id;})[0];
   if(!e||e.locked) return;
-  ev.preventDefault(); ev.stopPropagation(); col.setPointerCapture(ev.pointerId);
   const a=parseTime(e.start), b=parseTime(e.end);
+  if(crossesDay(a,b)){ toast('This entry runs past midnight — adjust it from the Log screen'); return; }
+  ev.preventDefault(); ev.stopPropagation(); col.setPointerCapture(ev.pointerId);
   blk.classList.add('drag');
   drag={ mode:resize?'resize':'move', col:col, e:e, blk:blk, a:a, b:b, a0:a, len:b-a,
          grab:yToMin(col,ev.clientY) };
@@ -1432,7 +1503,7 @@ function paintTimer(){
 $('#timerBtn').onclick=async function(){
   if(timer){
     clearInterval(timer); timer=null;
-    const a=tStartMin, b=Math.max(a+1,nowMinHK());
+    const a=tStartMin; let b=nowMinHK(); if(b===a) b=a+1;   // b earlier than a = the timer ran past midnight; handled as a cross-day entry
     tSecs=0; tStartMin=null; saveTimer(); paintTimer();
     $('#tStart').value=t2s(a); $('#tEnd').value=t2s(b);
     if(selTask){ tryAdd(); } else toast('Timer stopped — pick a deliverable and press Add');
