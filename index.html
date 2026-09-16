@@ -807,7 +807,7 @@ async function start(){
   REAL_ME = S.me; VIEW_AS=null;
   $('#gate').style.display='none'; $('#shell').classList.add('on');
   // Sales admins watch hours rather than log them: give them the Jobs view and land there.
-  applyChrome(S.me.is_admin ? 'admin' : (S.isSalesAdmin && !S.me.tracks_time ? 'sales' : 'editor'), {jobs:S.isSalesAdmin});
+  applyChrome(roleFor(S), {log:S.me.tracks_time});
   setupPreviewTools();
   await loadFavs();
   renderAll();
@@ -824,14 +824,17 @@ function applyBoot(d){
   $('#whoami').textContent = S.me.name+' · '+S.me.role.replace('_',' ')+(VIEW_AS?' · preview':'');
   buildTargets(); fillRepFilters();
 }
+// The layout follows the PACMAN role, never the tracks_time flag (which the 15-minute sync may flip for a
+// couple of minutes): sales admin -> Jobs, editor -> Log. A sales admin who also logs time gets both.
+function roleFor(s){ return s.me.is_admin ? 'admin' : (s.isSalesAdmin ? 'sales' : 'editor'); }
 // Which rail entries a role sees. 'admin' = everything the real account may use.
 function applyChrome(role,extra){
   ROLE_VIEW=role; extra=extra||{};
   const realAdmin = REAL_ME && REAL_ME.is_admin;
   const show = {
     admin:  { log:1, cal:1, week:1, dash:1, jobs:1, rep:1, adm:realAdmin },
-    editor: { log:1, cal:1, week:1, dash:1, jobs:extra.jobs?1:0, rep:1, adm:0 },
-    sales:  { log:0, cal:0, week:0, dash:0, jobs:1, rep:1, adm:0 }
+    editor: { log:1, cal:1, week:1, dash:1, jobs:0, rep:1, adm:0 },
+    sales:  { log:extra.log?1:0, cal:extra.log?1:0, week:extra.log?1:0, dash:extra.log?1:0, jobs:1, rep:1, adm:0 }
   }[role] || {};
   Object.keys(show).forEach(function(k){ const a=document.querySelector('.rail a[data-go="'+k+'"]'); if(a) a.style.display = show[k] ? '' : 'none'; });
   $$('#roleSw button').forEach(function(b){ b.classList.toggle('on', b.dataset.role===role); });
@@ -886,10 +889,10 @@ async function setViewAs(uid){
   if(r.error||!r.data||r.data.error){ $('#viewAs').value=''; return toast(friendly(r.error||{message:String(r.data&&r.data.error)}),true); }
   const d=r.data; VIEW_AS={id:uid,name:d.me.name};
   applyBoot(d); FAVS={};
-  const role = d.me.is_admin ? 'admin' : (S.isSalesAdmin && !S.me.tracks_time ? 'sales' : 'editor');
-  applyChrome(role, {jobs:S.isSalesAdmin});
+  const role = roleFor(S);
+  applyChrome(role, {log:S.me.tracks_time});
   goPanel(role==='sales' ? 'jobs' : 'log');
-  const what = role==='sales' ? 'sales admin · sees Jobs and Reports' : role==='admin' ? 'admin' : (S.me.tracks_time ? 'logs time' : 'does not log time');
+  const what = role==='sales' ? ('sales admin · sees Jobs and Reports'+(S.me.tracks_time?' · also logs time':'')) : role==='admin' ? 'admin' : (S.me.tracks_time ? 'logs time' : 'does not log time');
   pvCaption('&#128065; Previewing as <b>'+esc(d.me.name)+'</b> · '+what+' · <b>read only</b> — nothing you do here is saved.<button id="pvExit">Exit preview</button>');
   renderAll();
 }
