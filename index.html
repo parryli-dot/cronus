@@ -445,7 +445,7 @@
   </aside>
 
   <main>
-    <!-- ============ PREVIEW TOOLS (admin test aid, hidden for everyone else) ============ -->
+    <!-- ============ PREVIEW TOOLS (admins only) ============ -->
     <div class="pvbar" id="pvbar" style="display:none">
       <span class="plab">Preview</span>
       <div class="rolesw" id="roleSw">
@@ -850,12 +850,12 @@ function goPanel(k){
 
 /* ================= PREVIEW TOOLS (admin) =================
    Same idea as Atrium: a role switcher shows the layout each role gets; "View as" loads a real
-   person's deliverables and hours read-only (bootstrap_as, admin-only on the server).           */
-const PREVIEW_TOOL_EMAILS = ['seek.li@presslogic.com','parry.li@presslogic.com'];
+   person's deliverables and hours read-only (bootstrap_as, admin-only on the server).
+   Available to every admin: previewing what a colleague sees is part of the admin job.     */
 let REAL_ME=null, VIEW_AS=null, ROLE_VIEW='admin', pvWired=false;
 function guardRO(){ if(VIEW_AS){ toast('Preview is read only — exit the preview to make changes'); return true; } return false; }
 function setupPreviewTools(){
-  const ok = REAL_ME && REAL_ME.is_admin && PREVIEW_TOOL_EMAILS.indexOf(String(REAL_ME.email||'').toLowerCase())>=0;
+  const ok = !!(REAL_ME && REAL_ME.is_admin);
   $('#pvbar').style.display = ok ? '' : 'none';
   if(!ok || pvWired) return; pvWired=true;
   $$('#roleSw button').forEach(function(b){ b.onclick=function(){ previewRole(b.dataset.role); }; });
