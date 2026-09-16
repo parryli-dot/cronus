@@ -364,8 +364,12 @@
   .jobs .io.created { color:var(--ink-2); }
   .jobs .item { font-weight:600; }
   .jobs .sub2 { font-size:12px; color:var(--muted); margin-top:2px; }
-  .jobs tbody tr.j { cursor:pointer; }
-  .jobs tbody tr.j:hover td { background:var(--booked-soft); }
+  .jobs tbody tr.j:hover td { background:var(--wash); }
+  .jobs td.tg { width:34px; text-align:right; }
+  .jtg { border:1px solid var(--line); background:var(--raised); color:var(--ink-2); border-radius:7px; width:26px; height:26px; cursor:pointer; font-size:12px; }
+  .jtg:hover, .jtg.on { background:var(--booked-soft); color:var(--booked); border-color:var(--booked-line); }
+  /* IO numbers are looked up in PACMAN: one click selects the whole number so it can be copied */
+  .iocopy { user-select:all; -webkit-user-select:all; cursor:text; }
   .jobs tr.jx td { background:#FBFBFC; padding:8px 11px 12px; }
   .jobs .jx table { min-width:0; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
   .jobs .jx th, .jobs .jx td { padding:6px 9px; font-size:12.5px; background:var(--raised); }
@@ -661,8 +665,8 @@
       </div>
       <div class="kpis" id="jKpis"></div>
       <div class="tblwrap"><table class="jobs" id="jTable">
-        <thead><tr><th>IO</th><th>IO created</th><th>Item</th><th>Status</th><th>Editor</th><th class="n">Hours (range)</th><th class="n">Total</th><th>Last logged</th></tr></thead>
-        <tbody id="jBody"><tr><td colspan="8" class="jempty">Loading…</td></tr></tbody>
+        <thead><tr><th>IO</th><th>IO created</th><th>Item</th><th>Status</th><th>Editor</th><th class="n">Hours (range)</th><th class="n">Total</th><th>Last logged</th><th></th></tr></thead>
+        <tbody id="jBody"><tr><td colspan="9" class="jempty">Loading…</td></tr></tbody>
       </table></div>
     </section>
 
@@ -1045,7 +1049,7 @@ function renderRows(){
     return '<div class="row '+(d.task_id===selTask?'cur':'')+'" data-id="'+d.task_id+'">'+
       pgChip(d.page)+
       '<div><div class="r1">'+esc(d.name)+'</div><div class="r2">'+esc(d.client||'internal')+
-      (d.io?' · '+esc(d.io):'')+(d.booked?'':' · <b style="color:var(--unbooked)">unbooked</b>')+'</div></div>'+
+      (d.io?' · <span class="iocopy">'+esc(d.io)+'</span>'+(d.io_created?' · '+esc(d.io_created):''):'')+(d.booked?'':' · <b style="color:var(--unbooked)">unbooked</b>')+'</div></div>'+
       '<span class="why '+cls+'">'+esc(why)+'</span>'+
       '<button class="star '+(FAVS[d.task_id]?'on':'')+'" data-fav="'+d.task_id+'" title="Favourite">'+
       (FAVS[d.task_id]?'&#9733;':'&#9734;')+'</button></div>';
@@ -1708,11 +1712,11 @@ function jobsDefaultRange(){
 }
 async function loadJobs(){
   if(!$('#jFrom').value){ const r=jobsDefaultRange(); $('#jFrom').value=r[0]; $('#jTo').value=r[1]; }
-  $('#jBody').innerHTML='<tr><td colspan="8" class="jempty">Loading…</td></tr>';
+  $('#jBody').innerHTML='<tr><td colspan="9" class="jempty">Loading…</td></tr>';
   const args={ p_scope:$('#jScope').value, p_from:$('#jFrom').value, p_to:$('#jTo').value };
   if(VIEW_AS) args.p_as=VIEW_AS.id;
   const r=await sb.rpc('jobs_overview',args);
-  if(r.error){ $('#jBody').innerHTML='<tr><td colspan="8" class="jempty">'+esc(friendly(r.error))+'</td></tr>'; return; }
+  if(r.error){ $('#jBody').innerHTML='<tr><td colspan="9" class="jempty">'+esc(friendly(r.error))+'</td></tr>'; return; }
   JOBS=r.data; jobsOpen=null; renderJobs();
 }
 function jobStatusPill(st){
@@ -1735,12 +1739,12 @@ function renderJobs(){
     kpi('All-time hours', hm(Math.round((sm.hours_total||0)*60)), 'on these items, incl. Clockify history') +
     kpi('Showing', rows.length, liveOnly?'live items only':'everything');
   $('#jobsSub').textContent = (JOBS.scope==='all' ? 'Live items across every sales admin.' : 'Every item under '+(VIEW_AS?VIEW_AS.name+'\u2019s':'your')+' IOs, straight from PACMAN.')+
-    ' Hours are what editors logged (Cronus and imported Clockify). Click a row for the entries.';
-  if(!rows.length){ $('#jBody').innerHTML='<tr><td colspan="8" class="jempty">Nothing matches.</td></tr>'; return; }
+    ' Hours are what editors logged (Cronus and imported Clockify). Use the arrow at the end of a row for its entries.';
+  if(!rows.length){ $('#jBody').innerHTML='<tr><td colspan="9" class="jempty">Nothing matches.</td></tr>'; return; }
   $('#jBody').innerHTML = rows.map(function(j){
     const open = jobsOpen===j.task_id;
     return '<tr class="j" data-j="'+j.task_id+'">'+
-      '<td class="io">'+esc(j.io||'—')+'</td>'+
+      '<td class="io"><span class="iocopy">'+esc(j.io||'—')+'</span></td>'+
       '<td class="io created">'+(j.io_created?esc(j.io_created):'—')+'</td>'+
       '<td><div class="item">'+esc(j.deliverable)+'</div><div class="sub2">'+esc([j.brand,j.client].filter(Boolean).join(' · '))+
         (j.tentative?' · due '+esc(j.tentative):'')+(JOBS.scope==='all'?' · '+esc(j.sales_admin||''):'')+'</div></td>'+
@@ -1748,11 +1752,12 @@ function renderJobs(){
       '<td class="ed">'+(j.editors?esc(j.editors):'<span style="color:var(--axis)">unassigned</span>')+'</td>'+
       '<td class="h'+(j.hours_range?'':' zero')+'">'+hm(Math.round(j.hours_range*60))+'</td>'+
       '<td class="h'+(j.hours_total?'':' zero')+'">'+hm(Math.round(j.hours_total*60))+'</td>'+
-      '<td class="last">'+(j.last?fmt(j.last):'—')+'</td></tr>'+
-      (open?'<tr class="jx"><td colspan="8" class="jx" id="jxCell">Loading entries…</td></tr>':'');
+      '<td class="last">'+(j.last?fmt(j.last):'—')+'</td>'+
+      '<td class="tg"><button class="jtg'+(open?' on':'')+'" data-tg="'+j.task_id+'" title="'+(open?'Hide entries':'Show entries')+'">'+(open?'&#9662;':'&#9656;')+'</button></td></tr>'+
+      (open?'<tr class="jx"><td colspan="9" class="jx" id="jxCell">Loading entries…</td></tr>':'');
   }).join('');
-  $$('#jBody tr.j').forEach(function(tr){ tr.onclick=function(){
-    jobsOpen = jobsOpen===tr.dataset.j ? null : tr.dataset.j; renderJobs(); if(jobsOpen) loadJobEntries(jobsOpen); }; });
+  $$('#jBody .jtg').forEach(function(b){ b.onclick=function(ev){ ev.stopPropagation();
+    jobsOpen = jobsOpen===b.dataset.tg ? null : b.dataset.tg; renderJobs(); if(jobsOpen) loadJobEntries(jobsOpen); }; });
 }
 async function loadJobEntries(taskId){
   const j=(JOBS.rows||[]).filter(function(x){return x.task_id===taskId;})[0]; if(!j) return;
