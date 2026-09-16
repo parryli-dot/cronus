@@ -120,7 +120,23 @@
   .row:last-child { border-bottom:0; }
   .row:hover, .row.cur { background:var(--wash); }
   .pg { width:30px;height:30px;border-radius:7px;display:grid;place-items:center;font-size:11px;
-    font-weight:700;color:#fff;background:var(--axis);flex:none; }
+    font-weight:700;color:#fff;background:var(--axis);flex:none; overflow:hidden; }
+  /* no page brand (internal / manual items): a quiet outlined chip instead of a grey block */
+  .pg.soft { background:var(--wash); color:var(--muted); border:1px solid var(--line); font-weight:600; font-size:10px; }
+
+  /* ---------- preview tools (admin only): role switcher + View as, after Atrium ---------- */
+  .pvbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 16px; padding:8px 12px;
+    background:var(--raised); border:1px solid var(--ring); border-radius:var(--r); font-size:12.5px; }
+  .pvbar .plab { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+  .rolesw { display:flex; gap:2px; background:var(--wash); border:1px solid var(--line); border-radius:20px; padding:2px; }
+  .rolesw button { border:0; background:none; padding:4px 12px; border-radius:20px; font-size:12.5px; color:var(--ink-2); cursor:pointer; font-weight:500; }
+  .rolesw button.on { background:var(--raised); color:var(--booked); font-weight:600; box-shadow:0 0 0 1px var(--booked-line); }
+  .pvbar select { margin-left:auto; border:1px solid var(--line); border-radius:7px; padding:5px 8px; font-size:12.5px;
+    background:var(--raised); color:var(--ink); max-width:230px; }
+  .pvcap { flex-basis:100%; color:var(--booked-deep); background:var(--booked-soft); border-radius:7px; padding:6px 10px; font-size:12px; line-height:1.45; }
+  .pvcap b { font-weight:650; }
+  .pvcap button { border:0; background:none; color:var(--booked); text-decoration:underline; font-size:12px; cursor:pointer; margin-left:8px; padding:0; }
+  .pvcap.warn { color:var(--unbooked-deep); background:var(--unbooked-soft); }
   .r1 { font-size:14px; font-weight:550; }
   .r2 { font-size:12.5px; color:var(--muted); margin-top:1px; }
   .why { font-size:11.5px; padding:3px 8px; border-radius:999px; background:var(--booked-soft); color:var(--booked);
@@ -429,6 +445,18 @@
   </aside>
 
   <main>
+    <!-- ============ PREVIEW TOOLS (admin test aid, hidden for everyone else) ============ -->
+    <div class="pvbar" id="pvbar" style="display:none">
+      <span class="plab">Preview</span>
+      <div class="rolesw" id="roleSw">
+        <button data-role="admin" class="on">Admin</button>
+        <button data-role="editor">Editor</button>
+        <button data-role="sales">Sales admin</button>
+      </div>
+      <select id="viewAs"><option value="">View as&hellip;</option></select>
+      <div class="pvcap" id="pvcap" style="display:none"></div>
+    </div>
+
     <!-- ============ LOG ============ -->
     <section class="panel on" id="p-log">
       <h1 class="hd">Log time</h1>
@@ -675,6 +703,10 @@ const monday = s => { const d=toD(s); d.setDate(d.getDate()-((d.getDay()+6)%7));
 const weekDays = m => Array.from({length:7},(_,i)=>shift(m,i));
 const PAGE_COL = { GS:'#2a78d6', HS:'#eb6834', MD:'#1baf7a', BF:'#4a3aa7', TB:'#e87ba4',
                    BK:'#eda100', UL:'#008300', PC:'#e34948' };
+// page chip: brand colour when we know the page; a quiet outlined chip (no fake entity text) when we don't
+function pgChip(page,extra){ const col=page?PAGE_COL[page]:null;
+  if(col) return '<span class="pg" style="background:'+col+';'+(extra||'')+'">'+esc(page)+'</span>';
+  return '<span class="pg soft" style="'+(extra||'')+'">'+(page?esc(page):'&#8212;')+'</span>'; }
 const DAY_START = 6*60, DAY_END = 23*60, HH = 46, SNAP = 15;   // grid 06:00–23:00
 const isNarrow = () => matchMedia('(max-width: 900px)').matches;
 
@@ -768,25 +800,108 @@ async function start(){
     else gateMsg('Cannot start',String(d.error),'');
     return;
   }
-  S=d;
-  S.deliverables.forEach(function(x){ TASK[x.task_id]=x; });
-  ENTRIES = S.entries.map(function(e){ e.mins=+e.mins; return e; });
-  selDate=S.today; weekMon=monday(S.today); calMon=monday(S.today);
-  $('#gate').style.display='none'; $('#shell').classList.add('on');
-  $('#whoami').textContent = S.me.name+' · '+S.me.role.replace('_',' ');
-  buildTargets(); fillRepFilters();
-  if(S.me.is_admin) $('#navAdm').style.display='';
-  // Sales admins watch hours rather than log them: give them the Jobs view and land there.
   const sa = await sb.rpc('app_is_sales_admin');
-  S.isSalesAdmin = !sa.error && sa.data === true;
-  if(S.isSalesAdmin || S.me.is_admin) $('#navJobs').style.display='';
-  if(S.isSalesAdmin && !S.me.tracks_time && !S.me.is_admin){
-    ['log','cal','week','dash'].forEach(function(k){ const a=document.querySelector('.rail a[data-go="'+k+'"]'); if(a) a.style.display='none'; });
-    goPanel('jobs');
-  }
+  d.is_sales_admin = !sa.error && sa.data === true;
+  applyBoot(d);
+  REAL_ME = S.me; VIEW_AS=null;
+  $('#gate').style.display='none'; $('#shell').classList.add('on');
+  // Sales admins watch hours rather than log them: give them the Jobs view and land there.
+  applyChrome(S.me.is_admin ? 'admin' : (S.isSalesAdmin && !S.me.tracks_time ? 'sales' : 'editor'), {jobs:S.isSalesAdmin});
+  setupPreviewTools();
   await loadFavs();
   renderAll();
   restoreTimer();
+}
+// Load a bootstrap payload (own or previewed) into the page state. Handlers are wired once elsewhere.
+function applyBoot(d){
+  S=d; TASK={};
+  S.deliverables.forEach(function(x){ TASK[x.task_id]=x; });
+  ENTRIES = S.entries.map(function(e){ e.mins=+e.mins; return e; });
+  S.isSalesAdmin = !!d.is_sales_admin;
+  selDate=S.today; weekMon=monday(S.today); calMon=monday(S.today);
+  selTask=null; selStage=null; openEdit=null; pendingBig=null; REP=null; JOBS=null; jobsOpen=null;
+  $('#whoami').textContent = S.me.name+' · '+S.me.role.replace('_',' ')+(VIEW_AS?' · preview':'');
+  buildTargets(); fillRepFilters();
+}
+// Which rail entries a role sees. 'admin' = everything the real account may use.
+function applyChrome(role,extra){
+  ROLE_VIEW=role; extra=extra||{};
+  const realAdmin = REAL_ME && REAL_ME.is_admin;
+  const show = {
+    admin:  { log:1, cal:1, week:1, dash:1, jobs:1, rep:1, adm:realAdmin },
+    editor: { log:1, cal:1, week:1, dash:1, jobs:extra.jobs?1:0, rep:1, adm:0 },
+    sales:  { log:0, cal:0, week:0, dash:0, jobs:1, rep:1, adm:0 }
+  }[role] || {};
+  Object.keys(show).forEach(function(k){ const a=document.querySelector('.rail a[data-go="'+k+'"]'); if(a) a.style.display = show[k] ? '' : 'none'; });
+  $$('#roleSw button').forEach(function(b){ b.classList.toggle('on', b.dataset.role===role); });
+  const cur = document.querySelector('.rail a.on');
+  if(!cur || !show[cur.dataset.go]) goPanel(role==='sales' ? 'jobs' : 'log');
+}
+function goPanel(k){
+  $$('.rail a').forEach(function(x){x.classList.toggle('on', x.dataset.go===k);});
+  $$('.panel').forEach(function(p){p.classList.remove('on');});
+  $('#p-'+k).classList.add('on');
+  if(k==='jobs') loadJobs();
+  if(k==='dash') runDash();
+  if(k==='rep'){ if(!REP) runReport(); else renderReport(); }
+  if(k==='week') renderWeek();
+  if(k==='cal') renderCal();
+}
+
+/* ================= PREVIEW TOOLS (admin) =================
+   Same idea as Atrium: a role switcher shows the layout each role gets; "View as" loads a real
+   person's deliverables and hours read-only (bootstrap_as, admin-only on the server).           */
+const PREVIEW_TOOL_EMAILS = ['seek.li@presslogic.com','parry.li@presslogic.com'];
+let REAL_ME=null, VIEW_AS=null, ROLE_VIEW='admin', pvWired=false;
+function guardRO(){ if(VIEW_AS){ toast('Preview is read only — exit the preview to make changes'); return true; } return false; }
+function setupPreviewTools(){
+  const ok = REAL_ME && REAL_ME.is_admin && PREVIEW_TOOL_EMAILS.indexOf(String(REAL_ME.email||'').toLowerCase())>=0;
+  $('#pvbar').style.display = ok ? '' : 'none';
+  if(!ok || pvWired) return; pvWired=true;
+  $$('#roleSw button').forEach(function(b){ b.onclick=function(){ previewRole(b.dataset.role); }; });
+  $('#viewAs').onchange=function(){ setViewAs(this.value); };
+  sb.rpc('report_scope').then(function(res){
+    if(res.error) return;
+    const sel=$('#viewAs');
+    (res.data||[]).filter(function(u){ return u.user_id!==REAL_ME.id; }).forEach(function(u){
+      const o=document.createElement('option'); o.value=u.user_id; o.textContent='View as '+u.name; sel.appendChild(o); });
+  });
+}
+function pvCaption(html,warn){ const c=$('#pvcap'); if(!html){ c.style.display='none'; c.innerHTML=''; return; }
+  c.style.display=''; c.className='pvcap'+(warn?' warn':''); c.innerHTML=html;
+  const x=$('#pvExit'); if(x) x.onclick=function(){ exitPreview(); }; }
+function previewRole(role){
+  if(VIEW_AS){ // role tabs describe the previewed person; switching role means leaving the person
+    exitPreview().then(function(){ previewRole(role); }); return; }
+  applyChrome(role);
+  if(role==='admin') pvCaption('');
+  else if(role==='editor') pvCaption('<b>Editor layout</b> — what someone who logs time sees. The items and hours are still yours; pick a person under <b>View as…</b> to see theirs.');
+  else pvCaption('<b>Sales admin layout</b> — no time logging, lands on Jobs. Jobs shows your own IOs; pick a sales admin under <b>View as…</b> to see theirs.');
+}
+async function setViewAs(uid){
+  if(!uid){ exitPreview(); return; }
+  if(timer) { $('#viewAs').value=''; return toast('Stop your timer before previewing someone else'); }
+  const r=await sb.rpc('bootstrap_as',{p_user:uid,p_days:60});
+  if(r.error||!r.data||r.data.error){ $('#viewAs').value=''; return toast(friendly(r.error||{message:String(r.data&&r.data.error)}),true); }
+  const d=r.data; VIEW_AS={id:uid,name:d.me.name};
+  applyBoot(d); FAVS={};
+  const role = d.me.is_admin ? 'admin' : (S.isSalesAdmin && !S.me.tracks_time ? 'sales' : 'editor');
+  applyChrome(role, {jobs:S.isSalesAdmin});
+  goPanel(role==='sales' ? 'jobs' : 'log');
+  const what = role==='sales' ? 'sales admin · sees Jobs and Reports' : role==='admin' ? 'admin' : (S.me.tracks_time ? 'logs time' : 'does not log time');
+  pvCaption('&#128065; Previewing as <b>'+esc(d.me.name)+'</b> · '+what+' · <b>read only</b> — nothing you do here is saved.<button id="pvExit">Exit preview</button>');
+  renderAll();
+}
+async function exitPreview(){
+  if(!VIEW_AS){ return; }
+  VIEW_AS=null; $('#viewAs').value='';
+  const r=await sb.rpc('bootstrap',{p_days:60});
+  if(r.error||!r.data||r.data.error){ location.reload(); return; }
+  const sa = await sb.rpc('app_is_sales_admin'); r.data.is_sales_admin = !sa.error && sa.data===true;
+  applyBoot(r.data); REAL_ME=S.me;
+  await loadFavs();
+  applyChrome('admin'); pvCaption('');
+  goPanel('log'); renderAll();
 }
 function goPanel(k){
   $$('.rail a').forEach(function(x){x.classList.toggle('on', x.dataset.go===k);});
@@ -921,11 +1036,10 @@ function renderRows(){
   }
   if(!set.length){ $('#rows').innerHTML='<div class="empty">Nothing here'+(q?' for &ldquo;'+esc(q)+'&rdquo;':'')+'. Try &ldquo;Search all bookings&rdquo;, or add a manual item below.</div>'; return; }
   $('#rows').innerHTML=set.slice(0,60).map(function(d){
-    const col=PAGE_COL[d.page]||'#c3c2b7';
     const why=d._remote?d.why:(dTab==='recent'?relDay(lastUsed(d.task_id)):roleLabel(d));
     const cls=d._remote?'pm':((d.roles||[])[0]||'pm');
     return '<div class="row '+(d.task_id===selTask?'cur':'')+'" data-id="'+d.task_id+'">'+
-      '<span class="pg" style="background:'+col+'">'+esc(d.page||'&mdash;')+'</span>'+
+      pgChip(d.page)+
       '<div><div class="r1">'+esc(d.name)+'</div><div class="r2">'+esc(d.client||'internal')+
       (d.io?' · '+esc(d.io):'')+(d.booked?'':' · <b style="color:var(--unbooked)">unbooked</b>')+'</div></div>'+
       '<span class="why '+cls+'">'+esc(why)+'</span>'+
@@ -969,6 +1083,7 @@ $('#addToggle').onclick=function(){
   if(f.classList.contains('on')) $('#mName').focus();
 };
 $('#mMake').onclick=async function(){
+  if(guardRO()) return;
   const pid=$('#mTarget').value, nm=$('#mName').value.trim();
   if(!pid) return toast('Nothing to attach it to');
   if(!nm) return toast('Give it a name');
@@ -1022,6 +1137,7 @@ async function insertEntry(row){
 function hkTime(iso){ const d=new Date(iso);
   return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Hong_Kong',hour:'2-digit',minute:'2-digit',hour12:false}).format(d); }
 async function patchEntry(e,patch){
+  if(guardRO()) return false;
   const before=JSON.parse(JSON.stringify(e));
   Object.assign(e,patch); renderAll();
   const a=e.start?parseTime(e.start):null, b=e.end?parseTime(e.end):null;
@@ -1034,12 +1150,14 @@ async function patchEntry(e,patch){
   return true;
 }
 async function removeEntry(e){
+  if(guardRO()) return false;
   ENTRIES=ENTRIES.filter(function(x){return x.id!==e.id;}); renderAll();
   const r=await sb.from('time_entries').delete().eq('id',e.id);
   if(r.error){ ENTRIES.push(e); renderAll(); toast(friendly(r.error),true); return false; }
   return true;
 }
 function tryAdd(){
+  if(guardRO()) return;
   const tt=currentTimes();
   if(!selTask) return toast('Pick a deliverable first');
   if(tt.a===null) { $('#tStart').focus(); return toast('Start time not understood — try 9:30 or 930'); }
@@ -1410,6 +1528,7 @@ function weekRows(){
 const cellMins=(task,date)=>ENTRIES.filter(function(e){return e.task_id===task&&e.date===date;})
   .reduce(function(a,e){return a+e.mins;},0);
 async function setCell(task,date,mins){
+  if(guardRO()){ renderWeek(); return; }
   const hits=ENTRIES.filter(function(e){return e.task_id===task&&e.date===date;});
   if(!mins){ for(const h of hits) await removeEntry(h); return; }
   if(hits.length){
@@ -1431,7 +1550,7 @@ function renderWeek(){
   $('#wLab').textContent=d0.getDate()+'–'+d6.getDate()+' '+MON[d6.getMonth()];
   const rows=weekRows();
   $('#wbody').innerHTML=rows.map(function(id){
-    const t=TASK[id], col=PAGE_COL[t.page]||'#c3c2b7';
+    const t=TASK[id];
     const cells=days.map(function(d,i){
       const m=cellMins(id,d), cls=i===5?'sat':i===6?'sun':'', future=d>S.today;
       return '<td class="n '+cls+'"><input class="cell '+(m?'has':'')+'" placeholder="'+(future?'':'·')+'" '+
@@ -1439,7 +1558,7 @@ function renderWeek(){
     }).join('');
     const tot=days.reduce(function(a,d){return a+cellMins(id,d);},0);
     return '<tr><td><div class="rowlab">'+
-      '<span class="pg" style="width:24px;height:24px;font-size:10px;background:'+col+'">'+esc(t.page||'&mdash;')+'</span>'+
+      pgChip(t.page,'width:24px;height:24px;font-size:10px;')+
       '<div><div style="font-size:13px">'+esc(t.name)+'</div>'+
       '<div style="font-size:11.5px;color:var(--muted)">'+esc(t.client||'internal')+
       (t.booked?'':' · <b style="color:var(--unbooked)">unbooked</b>')+'</div></div>'+
@@ -1562,6 +1681,7 @@ function paintTimer(){
   paintBar();
 }
 $('#timerBtn').onclick=async function(){
+  if(guardRO()) return;
   if(timer){
     clearInterval(timer); timer=null;
     const a=tStartMin; let b=nowMinHK(); if(b===a) b=a+1;   // b earlier than a = the timer ran past midnight; handled as a cross-day entry
@@ -1585,7 +1705,9 @@ function jobsDefaultRange(){
 async function loadJobs(){
   if(!$('#jFrom').value){ const r=jobsDefaultRange(); $('#jFrom').value=r[0]; $('#jTo').value=r[1]; }
   $('#jBody').innerHTML='<tr><td colspan="7" class="jempty">Loading…</td></tr>';
-  const r=await sb.rpc('jobs_overview',{ p_scope:$('#jScope').value, p_from:$('#jFrom').value, p_to:$('#jTo').value });
+  const args={ p_scope:$('#jScope').value, p_from:$('#jFrom').value, p_to:$('#jTo').value };
+  if(VIEW_AS) args.p_as=VIEW_AS.id;
+  const r=await sb.rpc('jobs_overview',args);
   if(r.error){ $('#jBody').innerHTML='<tr><td colspan="7" class="jempty">'+esc(friendly(r.error))+'</td></tr>'; return; }
   JOBS=r.data; jobsOpen=null; renderJobs();
 }
@@ -1608,7 +1730,7 @@ function renderJobs(){
     kpi('Hours logged', hm(Math.round((sm.hours_range||0)*60)), fmt(JOBS.from)+' – '+fmt(JOBS.to)+' · '+(sm.entries_range||0)+' entries') +
     kpi('All-time hours', hm(Math.round((sm.hours_total||0)*60)), 'on these items, incl. Clockify history') +
     kpi('Showing', rows.length, liveOnly?'live items only':'everything');
-  $('#jobsSub').textContent = (JOBS.scope==='all' ? 'Live items across every sales admin.' : 'Every item under your IOs, straight from PACMAN.')+
+  $('#jobsSub').textContent = (JOBS.scope==='all' ? 'Live items across every sales admin.' : 'Every item under '+(VIEW_AS?VIEW_AS.name+'\u2019s':'your')+' IOs, straight from PACMAN.')+
     ' Hours are what editors logged (Cronus and imported Clockify). Click a row for the entries.';
   if(!rows.length){ $('#jBody').innerHTML='<tr><td colspan="7" class="jempty">Nothing matches.</td></tr>'; return; }
   $('#jBody').innerHTML = rows.map(function(j){
@@ -1653,6 +1775,7 @@ async function loadFavs(){
   if(!r.error){ FAVS={}; (r.data||[]).forEach(function(x){ FAVS[x.task_id]=1; }); }
 }
 async function toggleFav(id){
+  if(guardRO()) return;
   if(FAVS[id]){ delete FAVS[id]; renderRows();
     const r=await sb.from('favourites').delete().eq('task_id',id);
     if(r.error){ FAVS[id]=1; renderRows(); toast(friendly(r.error),true); } }
@@ -1682,6 +1805,7 @@ function fillRepFilters(){
     if(res.error) return;
     $('#rUser').innerHTML='<option value="">Everyone I can see ('+(res.data||[]).length+')</option>'+
       (res.data||[]).map(function(u){ return '<option value="'+u.user_id+'">'+esc(u.name)+'</option>'; }).join('');
+    if(VIEW_AS){ $('#rUser').value=VIEW_AS.id; $('#repSub').textContent='Preview: filtered to '+VIEW_AS.name+' (your admin scope still applies).'; return; }
     $('#repSub').textContent='You can report on '+(res.data||[]).length+
       (res.data.length===1?' person':' people')+(S.me.is_admin?' · amounts visible':' · amounts hidden');
   });
@@ -1779,7 +1903,7 @@ function renderDetailed(rows){
     }).join(''):'<tr><td colspan="9">Nothing in range.</td></tr>')+
     '</tbody></table></div><p class="note">'+rows.length+' entries. Export with the CSV button.'+
     ((S.me.is_admin||S.me.is_manager)?' Click any row to edit or delete it.':'')+'</p>';
-  if(S.me.is_admin||S.me.is_manager) wireDetailedEdit();
+  if((S.me.is_admin||S.me.is_manager) && !VIEW_AS) wireDetailedEdit();
 }
 function renderWeekly(rows){
   const from=$('#rFrom').value, to=$('#rTo').value;
@@ -1849,7 +1973,8 @@ $$('.rtab').forEach(function(b){ b.onclick=function(){
 async function runDash(){
   const r=rangeFor($('#dRange').value);
   const rr=($('#rRound')?$('#rRound').value:'15|up').split('|');
-  const res=await sb.rpc('report_data',{p_from:r[0],p_to:r[1],p_round:+rr[0],p_mode:rr[1]});
+  const dargs={p_from:r[0],p_to:r[1],p_round:+rr[0],p_mode:rr[1]}; if(VIEW_AS) dargs.p_users=[S.me.id];
+  const res=await sb.rpc('report_data',dargs);
   if(res.error) return toast(friendly(res.error),true);
   const rows=res.data.rows||[], tot=rows.reduce(function(a,e){return a+e.mins;},0);
   const amt=rows.reduce(function(a,e){return a+(e.amount||0);},0);
