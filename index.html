@@ -361,6 +361,7 @@
   /* ---------- jobs (sales admin view) ---------- */
   .jobs td { vertical-align:top; }
   .jobs .io { font-family:var(--mono); font-size:12.5px; white-space:nowrap; }
+  .jobs .io.created { color:var(--ink-2); }
   .jobs .item { font-weight:600; }
   .jobs .sub2 { font-size:12px; color:var(--muted); margin-top:2px; }
   .jobs tbody tr.j { cursor:pointer; }
@@ -660,8 +661,8 @@
       </div>
       <div class="kpis" id="jKpis"></div>
       <div class="tblwrap"><table class="jobs" id="jTable">
-        <thead><tr><th>IO</th><th>Item</th><th>Status</th><th>Editor</th><th class="n">Hours (range)</th><th class="n">Total</th><th>Last logged</th></tr></thead>
-        <tbody id="jBody"><tr><td colspan="7" class="jempty">Loading…</td></tr></tbody>
+        <thead><tr><th>IO</th><th>IO created</th><th>Item</th><th>Status</th><th>Editor</th><th class="n">Hours (range)</th><th class="n">Total</th><th>Last logged</th></tr></thead>
+        <tbody id="jBody"><tr><td colspan="8" class="jempty">Loading…</td></tr></tbody>
       </table></div>
     </section>
 
@@ -1704,11 +1705,11 @@ function jobsDefaultRange(){
 }
 async function loadJobs(){
   if(!$('#jFrom').value){ const r=jobsDefaultRange(); $('#jFrom').value=r[0]; $('#jTo').value=r[1]; }
-  $('#jBody').innerHTML='<tr><td colspan="7" class="jempty">Loading…</td></tr>';
+  $('#jBody').innerHTML='<tr><td colspan="8" class="jempty">Loading…</td></tr>';
   const args={ p_scope:$('#jScope').value, p_from:$('#jFrom').value, p_to:$('#jTo').value };
   if(VIEW_AS) args.p_as=VIEW_AS.id;
   const r=await sb.rpc('jobs_overview',args);
-  if(r.error){ $('#jBody').innerHTML='<tr><td colspan="7" class="jempty">'+esc(friendly(r.error))+'</td></tr>'; return; }
+  if(r.error){ $('#jBody').innerHTML='<tr><td colspan="8" class="jempty">'+esc(friendly(r.error))+'</td></tr>'; return; }
   JOBS=r.data; jobsOpen=null; renderJobs();
 }
 function jobStatusPill(st){
@@ -1732,11 +1733,12 @@ function renderJobs(){
     kpi('Showing', rows.length, liveOnly?'live items only':'everything');
   $('#jobsSub').textContent = (JOBS.scope==='all' ? 'Live items across every sales admin.' : 'Every item under '+(VIEW_AS?VIEW_AS.name+'\u2019s':'your')+' IOs, straight from PACMAN.')+
     ' Hours are what editors logged (Cronus and imported Clockify). Click a row for the entries.';
-  if(!rows.length){ $('#jBody').innerHTML='<tr><td colspan="7" class="jempty">Nothing matches.</td></tr>'; return; }
+  if(!rows.length){ $('#jBody').innerHTML='<tr><td colspan="8" class="jempty">Nothing matches.</td></tr>'; return; }
   $('#jBody').innerHTML = rows.map(function(j){
     const open = jobsOpen===j.task_id;
     return '<tr class="j" data-j="'+j.task_id+'">'+
       '<td class="io">'+esc(j.io||'—')+'</td>'+
+      '<td class="io created">'+(j.io_created?esc(j.io_created):'—')+'</td>'+
       '<td><div class="item">'+esc(j.deliverable)+'</div><div class="sub2">'+esc([j.brand,j.client].filter(Boolean).join(' · '))+
         (j.tentative?' · due '+esc(j.tentative):'')+(JOBS.scope==='all'?' · '+esc(j.sales_admin||''):'')+'</div></td>'+
       '<td>'+jobStatusPill(j.status)+'</td>'+
@@ -1744,7 +1746,7 @@ function renderJobs(){
       '<td class="h'+(j.hours_range?'':' zero')+'">'+hm(Math.round(j.hours_range*60))+'</td>'+
       '<td class="h'+(j.hours_total?'':' zero')+'">'+hm(Math.round(j.hours_total*60))+'</td>'+
       '<td class="last">'+(j.last?fmt(j.last):'—')+'</td></tr>'+
-      (open?'<tr class="jx"><td colspan="7" class="jx" id="jxCell">Loading entries…</td></tr>':'');
+      (open?'<tr class="jx"><td colspan="8" class="jx" id="jxCell">Loading entries…</td></tr>':'');
   }).join('');
   $$('#jBody tr.j').forEach(function(tr){ tr.onclick=function(){
     jobsOpen = jobsOpen===tr.dataset.j ? null : tr.dataset.j; renderJobs(); if(jobsOpen) loadJobEntries(jobsOpen); }; });
