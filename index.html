@@ -113,7 +113,7 @@
   .saved button { border:1px solid #BBF7D0; background:var(--raised); color:var(--good-text); border-radius:7px; padding:5px 10px; font-size:12.5px; font-weight:600; cursor:pointer; }
   .saved button:hover { background:#DCFCE7; }
   @keyframes savedin { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
-  .e.flash { animation:flash 2.4s ease-out; }
+  .e.flash, .row.flash { animation:flash 2.4s ease-out; }
   @keyframes flash { 0%,35% { background:#DCFCE7; box-shadow:0 0 0 2px #86EFAC inset; } 100% { background:transparent; box-shadow:none; } }
   .guard button { border:1px solid currentColor; background:transparent; border-radius:7px;
     padding:5px 11px; font-size:12.5px; font-weight:650; }
@@ -1163,6 +1163,14 @@ $('#dsearch').oninput=function(){
 };
 
 /* ---------- manual items ---------- */
+/* a freshly created item goes to the top of My deliverables, the list scrolls to it and it flashes */
+function revealNew(taskId){
+  $$('.dtab').forEach(function(x){x.classList.remove('on');}); document.querySelector('.dtab[data-d="mine"]').classList.add('on'); dTab='mine';
+  $('#dsearch').value=''; $('#dsearch').placeholder='Filter your deliverables...';
+  renderAll();
+  const el=document.querySelector('#rows .row[data-id="'+taskId+'"]'); if(!el) return;
+  $('#rows').scrollTop=0; el.scrollIntoView({block:'nearest'}); el.classList.add('flash');
+}
 function buildTargets(){
   const t=S.targets||[];
   $('#mTarget').innerHTML=t.map(function(x){
@@ -1241,14 +1249,12 @@ $('#ncMake').onclick=async function(){
   ['#ncCamp','#ncBrand','#ncSales','#ncPM'].forEach(function(id){ $(id).value=''; });
   if(k==='pitching'){
     const lab=(d.code?d.code+' · ':'')+d.name;
-    (d.task_list||[]).forEach(function(x){
-      if(TASK[x.task_id]) return;
-      TASK[x.task_id]={ task_id:x.task_id, project_id:d.project_id, name:x.name, client:lab, io:null, page:null, kind:'pitching',
+    (d.task_list||[]).slice().reverse().forEach(function(x){
+      if(!TASK[x.task_id]) TASK[x.task_id]={ task_id:x.task_id, project_id:d.project_id, name:x.name, client:lab, io:null, page:null, kind:'pitching',
         roles:['manual'], live:true, booked:false, internal:false, suggest:null };
-      S.deliverables.push(TASK[x.task_id]);
+      S.deliverables=S.deliverables.filter(function(y){return y.task_id!==x.task_id;}); S.deliverables.unshift(TASK[x.task_id]);
     });
-    renderAll();
-    const first=(d.task_list||[])[0]; if(first){ selTask=first.task_id; selStage=null; renderRows(); paintBar(); }
+    const first=(d.task_list||[])[0]; if(first){ selTask=first.task_id; selStage=null; revealNew(first.task_id); } else renderAll();
     toast(d.existing?'That campaign already existed — its tasks are in your list':'Campaign created — its 10 tasks are in your list, first one selected');
   } else {
     toast(d.existing?'That event already existed — add work under it':'Event created — now add what you did under it');
@@ -1274,11 +1280,11 @@ $('#mMake').onclick=async function(){
   TASK[d.task_id]={ task_id:d.task_id, project_id:d.project_id, name:d.name,
     client:k==='internal'?null:(ioM?ioM[2]:lab), io:ioM?ioM[1]:null, page:null, kind:d.kind||null,
     roles:[k==='internal'?'internal':'manual'], live:true, booked:false, internal:k==='internal', suggest:null };
-  if(!S.deliverables.some(function(x){return x.task_id===d.task_id;})) S.deliverables.push(TASK[d.task_id]);
+  S.deliverables=S.deliverables.filter(function(x){return x.task_id!==d.task_id;}); S.deliverables.unshift(TASK[d.task_id]);
   selTask=d.task_id; selStage=null;
   $('#mName').value=''; $('#mIOpick').style.display='none'; $('#addToggle').click();
-  renderAll();
-  toast(d.existing?'That already existed — selected it':'Created and selected');
+  revealNew(d.task_id);
+  toast(d.existing?'That already existed — it is at the top of your list and selected':'Added to the top of your list and selected — now fill in the time and press Add');
 };
 
 /* ---------- writes ---------- */
