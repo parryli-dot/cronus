@@ -96,6 +96,7 @@
   .dur.warn { color:var(--warn-text); }
   .add { border:0; border-radius:8px; padding:10px 20px; font-weight:650; color:#fff; background:var(--booked); }
   .add:disabled { background:var(--axis); cursor:not-allowed; }
+  .quick:disabled { color:var(--muted); background:var(--plane); cursor:not-allowed; opacity:.7; }
   .add.done { background:var(--good-text); transition:background .2s; }
   .add.done:disabled { background:var(--good-text); cursor:default; }
   .kb { font-size:11.5px; color:var(--muted); padding:0 12px 10px; }
@@ -1774,6 +1775,10 @@ function renderWeek(){
   const days=weekDays(weekMon), d0=toD(days[0]), d6=toD(days[6]);
   $('#wLab').textContent=d0.getDate()+'–'+d6.getDate()+' '+MON[d6.getMonth()];
   const rows=weekRows();
+  const prevDays=weekDays(shift(weekMon,-7)), prevN=ENTRIES.filter(function(e){return prevDays.indexOf(e.date)>=0;}).length;
+  const cl=$('#copyLast'); cl.disabled=!prevN;
+  cl.title=prevN?'Copies last week\u2019s hours into this week\u2019s empty cells (Mon\u2013Fri, up to today)'
+    :'Last week ('+toD(prevDays[0]).getDate()+'\u2013'+toD(prevDays[6]).getDate()+' '+MON[toD(prevDays[6]).getMonth()]+') has no hours to copy';
   $('#wbody').innerHTML=rows.map(function(id){
     const t=TASK[id];
     const cells=days.map(function(d,i){
@@ -1828,7 +1833,7 @@ $('#copyLast').onclick=async function(){
     const tasks=[]; ENTRIES.forEach(function(e){ if(e.date===prev[i]&&tasks.indexOf(e.task_id)<0) tasks.push(e.task_id); });
     for(const id of tasks){ if(cellMins(id,cur[i])) continue; await setCell(id,cur[i],cellMins(id,prev[i])); n++; }
   }
-  renderAll(); toast(n?('Copied '+n+' cells from last week'):'Nothing to copy');
+  renderAll(); toast(n?('Copied '+n+' cells from last week'):'Nothing to copy \u2014 every cell last week filled is already filled this week (or falls after today)');
 };
 
 /* ---------- wiring ---------- */
