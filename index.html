@@ -154,6 +154,44 @@
   .fgrid input, .fgrid select { width:100%; border:1px solid var(--line); border-radius:8px;
     padding:9px 10px; font-size:13.5px; background:var(--raised); }
   .mk { border:0;border-radius:8px;padding:10px 16px;font-weight:650;color:#fff;background:var(--booked); }
+  .fgrid.io { grid-template-columns:minmax(200px,1.4fr) auto minmax(200px,1.6fr) auto; }
+  .fgrid.io #mKindWrap select { min-width:150px; }
+  .iohits { position:relative; }
+  .iohits .hits { position:absolute; left:0; right:0; top:100%; z-index:5; background:var(--raised); border:1px solid var(--line);
+    border-radius:8px; margin-top:4px; max-height:240px; overflow:auto; box-shadow:0 8px 24px rgba(15,23,42,.08); }
+  .iohits .hit { padding:8px 10px; font-size:13px; cursor:pointer; display:flex; justify-content:space-between; gap:8px; }
+  .iohits .hit:hover { background:var(--wash); }
+  .iohits .hit .m { color:var(--muted); font-size:12px; white-space:nowrap; }
+  .iohits .hit .m.live { color:var(--booked); font-weight:600; }
+  .iopick { font-size:12.5px; color:var(--ink-2); margin-top:4px; }
+  .iopick b { font-family:var(--mono); }
+  .why.manual { background:var(--wash); color:var(--ink-2); }
+  .kd { display:inline-block; font-size:10.5px; font-weight:650; padding:1px 6px; border-radius:4px; margin-left:6px;
+    background:var(--wash); color:var(--ink-2); vertical-align:1px; }
+  .jobs tr.x td { background:var(--wash); }
+  .mo .sect { display:flex; align-items:baseline; gap:10px; margin:18px 0 8px; }
+  .mo .sect h3 { margin:0; }
+  .mo .sect .mini { color:var(--muted); }
+  .mo table td.n, .mo table th.n { text-align:right; font-family:var(--mono); font-size:12.5px; white-space:nowrap; }
+  .mo tr.grp td { cursor:pointer; }
+  .mo tr.grp:hover td { background:var(--wash); }
+  .mo tr.sub td { background:var(--wash); font-size:12.5px; color:var(--ink-2); padding-top:4px; padding-bottom:4px; }
+  .mo .tag { display:inline-block; font-size:10.5px; font-weight:650; padding:1px 6px; border-radius:4px; background:var(--wash); color:var(--ink-2); margin-left:6px; vertical-align:1px; }
+  .mo .mobar { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; margin-bottom:6px; }
+  .mo .mobar .fld label { font-size:11.5px; color:var(--muted); font-weight:650; display:block; margin-bottom:4px; }
+  .mo .mobar select { border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13.5px; background:var(--raised); }
+  .mo .mobar input[type=month] { border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13.5px; background:var(--raised); }
+  .jview { display:flex; gap:4px; margin:0 0 12px; }
+  .jview button { border:1px solid var(--line); background:var(--raised); border-radius:20px; padding:6px 13px; font-size:13px; cursor:pointer; }
+  .jview button.on { background:var(--booked); color:#fff; border-color:var(--booked); font-weight:600; }
+  .camp .lk { display:flex; gap:6px; align-items:center; }
+  .camp .lk input { width:150px; border:1px solid var(--line); border-radius:6px; padding:5px 7px; font-size:12.5px; font-family:var(--mono); }
+  .camp .lk button, .tbtn.sm { border:1px solid var(--line); background:var(--raised); border-radius:6px; padding:5px 9px; font-size:12px; cursor:pointer; }
+  .camp .ios span { display:inline-block; font-family:var(--mono); font-size:11.5px; background:var(--wash); border-radius:4px; padding:1px 6px; margin:1px 3px 1px 0; }
+  .newcamp { margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); }
+  .newcamp .lnk { font-size:13px; color:var(--booked); font-weight:600; cursor:pointer; }
+  .newcamp .fgrid { margin-top:8px; grid-template-columns:120px repeat(auto-fit,minmax(150px,1fr)); }
+  .jobs tr.x .item { font-style:italic; }
 
   /* ---------- tiles ---------- */
   .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin:20px 0 0; }
@@ -507,10 +545,32 @@
         <div class="rows" id="rows"></div>
         <div class="addrow" id="addToggle">&#65291; Add something that isn&rsquo;t in PACMAN</div>
         <div class="form" id="addForm">
-          <div class="fgrid">
-            <div><label>Attach to</label><select id="mTarget"></select></div>
-            <div><label>What is it?</label><input id="mName" placeholder="e.g. Q3 planning workshop" maxlength="120"></div>
+          <div class="fgrid io">
+            <div class="iohits"><label>Attach to</label><select id="mTarget"></select>
+              <input id="mIOq" placeholder="…or type an IO number / brand to find any booking" autocomplete="off" style="margin-top:6px">
+              <div class="hits" id="mIOhits" style="display:none"></div>
+              <div class="iopick" id="mIOpick" style="display:none"></div></div>
+            <div id="mKindWrap"><label>Type of work</label><select id="mKind">
+              <option value="retainer">Retainer post</option><option value="tech">Tech task</option>
+              <option value="bonus">Bonus item</option><option value="other">Other</option></select></div>
+            <div><label id="mNameLab">What is it?</label><input id="mName" placeholder="e.g. Q3 planning workshop" maxlength="120">
+              <select id="mTech" style="display:none">
+                <option>Front End</option><option>Back End</option><option>APP Development</option><option>UI/UX</option>
+                <option>QA</option><option>UAT</option><option>Product Management</option><option>Project Management</option>
+                <option>Product Support</option></select></div>
             <div><button class="mk" id="mMake">Create</button></div>
+          </div>
+          <div class="newcamp">
+            <span class="lnk" id="ncToggle">&#65291; Start a new pitching campaign or event</span>
+            <div class="fgrid" id="ncForm" style="display:none">
+              <div><label>Kind</label><select id="ncKind"><option value="pitching">Pitching</option><option value="event">Event</option></select></div>
+              <div id="ncF1"><label>Campaign</label><input id="ncCamp" placeholder="e.g. Q2'2026 TVC" maxlength="80"></div>
+              <div id="ncF2"><label>Brand</label><input id="ncBrand" placeholder="e.g. Zero Crystal" maxlength="80"></div>
+              <div id="ncF3"><label>Sales</label><input id="ncSales" placeholder="name" maxlength="40"></div>
+              <div id="ncF4"><label>PM</label><input id="ncPM" placeholder="name" maxlength="40"></div>
+              <div><button class="mk" id="ncMake">Create</button></div>
+            </div>
+            <p class="note" id="ncPreview" style="display:none;margin:6px 0 0"></p>
           </div>
           <p class="note" id="mNote" style="margin-bottom:0"></p>
         </div>
@@ -644,6 +704,7 @@
         <button class="rtab" data-r="detailed">Detailed</button>
         <button class="rtab" data-r="weekly">Weekly</button>
         <button class="rtab" data-r="audit">Time audit</button>
+        <button class="rtab" data-r="monthly">Monthly (Finance)</button>
       </div>
       <div class="kpis" id="rKpis"></div>
       <div id="rBody"></div>
@@ -653,7 +714,8 @@
     <section class="panel" id="p-jobs">
       <h1 class="hd">Jobs</h1>
       <p class="sub" id="jobsSub">Every item under your IOs, straight from PACMAN, with the hours editors have logged on it.</p>
-      <div class="filters">
+      <div class="jview"><button class="on" data-jv="items">PACMAN items</button><button data-jv="camp">Pitching &amp; events</button></div>
+      <div class="filters" id="jFilters">
         <div class="fld"><label>Scope</label><select id="jScope">
           <option value="mine">My IOs</option><option value="all">All sales admins (live items)</option></select></div>
         <div class="fld"><label>Show</label><select id="jLive">
@@ -663,11 +725,21 @@
         <div class="fld"><label>Search</label><input id="jQ" placeholder="IO, brand, item, editor…"></div>
         <div class="fld"><label>&nbsp;</label><button class="add" id="jRun">Refresh</button></div>
       </div>
+      <div id="jItems">
       <div class="kpis" id="jKpis"></div>
       <div class="tblwrap"><table class="jobs" id="jTable">
         <thead><tr><th>IO</th><th>IO created</th><th>Item</th><th>Status</th><th>Editor</th><th class="n">Hours (range)</th><th class="n">Total</th><th>Last logged</th><th></th></tr></thead>
         <tbody id="jBody"><tr><td colspan="9" class="jempty">Loading…</td></tr></tbody>
       </table></div>
+      </div>
+      <div id="jCamp" style="display:none">
+        <p class="note" id="campNote">Pitching campaigns and internal events are work without an IO. Link a campaign to its IO once the deal closes — its hours then count under that IO in the monthly report. Events can list the IOs they cover.</p>
+        <div class="filters"><div class="fld"><label>Show</label><select id="campArch"><option value="0">Active</option><option value="1">Including archived</option></select></div>
+          <div class="fld"><label>&nbsp;</label><button class="add" id="campRun">Refresh</button></div></div>
+        <div class="tblwrap"><table class="jobs camp" id="campTable">
+          <thead><tr><th>Kind</th><th>Campaign / event</th><th>Brand</th><th>IO</th><th class="n">Tasks</th><th class="n">This month</th><th class="n">Total</th><th class="n">People</th><th>Last logged</th><th></th></tr></thead>
+          <tbody id="campBody"><tr><td colspan="10" class="jempty">Loading…</td></tr></tbody></table></div>
+      </div>
     </section>
 
     <!-- ============ ADMIN ============ -->
@@ -1026,7 +1098,7 @@ function recentTasks(){ const seen=[];
     .forEach(function(e){ if(seen.indexOf(e.task_id)<0) seen.push(e.task_id); });
   return seen.filter(function(id){return TASK[id];}).slice(0,8); }
 function roleLabel(d){ const r=(d.roles||[])[0]||'';
-  return {editor_pic:'Editor PIC',crew:'Crew',pm:'Assigned PM',sales_admin:'Your IO',internal:'Internal',logged:'Logged before'}[r]||r; }
+  return {editor_pic:'Editor PIC',crew:'Crew',pm:'Assigned PM',sales_admin:'Your IO',internal:'Internal',logged:'Logged before',manual:'Added by you'}[r]||r; }
 const relDay = d => !d?'':d===S.today?'today':d===shift(S.today,-1)?'yesterday':fmt(d);
 
 function renderRows(){
@@ -1048,7 +1120,7 @@ function renderRows(){
     const cls=d._remote?'pm':((d.roles||[])[0]||'pm');
     return '<div class="row '+(d.task_id===selTask?'cur':'')+'" data-id="'+d.task_id+'">'+
       pgChip(d.page)+
-      '<div><div class="r1">'+esc(d.name)+'</div><div class="r2">'+esc(d.client||'internal')+
+      '<div><div class="r1">'+esc(d.name)+(d.kind?'<span class="kd">'+esc(KIND_LAB[d.kind]||d.kind)+'</span>':'')+'</div><div class="r2">'+esc(d.client||'internal')+
       (d.io?' · <span class="iocopy">'+esc(d.io)+'</span>'+(d.io_created?' · '+esc(d.io_created):''):'')+(d.booked?'':' · <b style="color:var(--unbooked)">unbooked</b>')+'</div></div>'+
       '<span class="why '+cls+'">'+esc(why)+'</span>'+
       '<button class="star '+(FAVS[d.task_id]?'on':'')+'" data-fav="'+d.task_id+'" title="Favourite">'+
@@ -1081,10 +1153,93 @@ function buildTargets(){
   const t=S.targets||[];
   $('#mTarget').innerHTML=t.map(function(x){
     return '<option value="'+x.project_id+'" data-kind="'+x.kind+'">'+esc(x.label)+'</option>'; }).join('');
-  $('#mNote').innerHTML = S.me.is_pm
-    ? 'Internal work is open to everyone. Extra items on a booking count as <b>unbooked</b> effort in margin.'
-    : 'You can add internal work. Extra items on a client booking are limited to project managers and admins.';
+  $('#mNote').innerHTML = 'Anyone can add work under a booking: retainer posts, tech tasks, bonus items. It shows on the sales admin\u2019s Jobs page and counts as <b>unbooked</b> effort in margin.';
+  syncKindUI();
 }
+const KIND_LAB={retainer:'Retainer post',tech:'Tech task',bonus:'Bonus item',other:'Extra',pitching:'Pitching',event:'Event'};
+function targetKind(){ const o=$('#mTarget').selectedOptions[0]; return o?o.dataset.kind:'internal'; }
+function syncKindUI(){
+  const k=targetKind(), booking=k==='booking';
+  $('#mKindWrap').style.display = booking?'':'none';
+  const tech = booking && $('#mKind').value==='tech';
+  $('#mTech').style.display = tech?'':'none'; $('#mName').style.display = tech?'none':'';
+  $('#mNameLab').textContent = tech?'Tech task':(booking&&$('#mKind').value==='retainer'?'Post (first words) + date':'What is it?');
+  $('#mName').placeholder = booking ? ($('#mKind').value==='retainer'?'e.g. 09-03 手造西餅':$('#mKind').value==='bonus'?'e.g. Bonus item: extra IG story':'e.g. Client briefing call') : (k==='pitching'?'e.g. Deck Creation':k==='event'?'e.g. Venue recce':'e.g. Q3 planning workshop');
+}
+$('#mTarget').onchange=syncKindUI; $('#mKind').onchange=syncKindUI;
+let ioTimer=null;
+$('#mIOq').oninput=function(){
+  clearTimeout(ioTimer); const q=$('#mIOq').value.trim(); const box=$('#mIOhits');
+  if(q.length<2){ box.style.display='none'; return; }
+  ioTimer=setTimeout(async function(){
+    const r=await sb.rpc('search_bookings',{q:q,lim:12});
+    if(r.error){ toast(friendly(r.error),true); return; }
+    const hits=r.data||[];
+    box.innerHTML = hits.length ? hits.map(function(h){
+      return '<div class="hit" data-pid="'+h.project_id+'" data-io="'+esc(h.io)+'" data-lab="'+esc([h.io,h.brand||h.client].filter(Boolean).join(' — '))+'">'+
+        '<span><b style="font-family:var(--mono)">'+esc(h.io)+'</b> '+esc(h.brand||h.client||'')+'</span>'+
+        '<span class="m'+(h.live?' live':'')+'">'+(h.live?'live':'closed')+(h.io_created?' · '+esc(h.io_created):'')+'</span></div>'; }).join('')
+      : '<div class="hit"><span class="m">No booking matches.</span></div>';
+    box.style.display='';
+    $$('#mIOhits .hit[data-pid]').forEach(function(el){ el.onclick=function(){
+      const sel=$('#mTarget'); let opt=sel.querySelector('option[value="'+el.dataset.pid+'"]');
+      if(!opt){ opt=document.createElement('option'); opt.value=el.dataset.pid; opt.dataset.kind='booking'; opt.textContent=el.dataset.lab; sel.appendChild(opt); }
+      sel.value=el.dataset.pid; box.style.display='none'; $('#mIOq').value='';
+      $('#mIOpick').style.display=''; $('#mIOpick').innerHTML='Adding under <b>'+esc(el.dataset.io)+'</b>';
+      syncKindUI(); $('#mName').focus();
+    }; });
+  },180);
+};
+document.addEventListener('click',function(e){ if(!e.target.closest('.iohits')) $('#mIOhits').style.display='none'; });
+/* ---- new pitching campaign / event ---- */
+function ncName(){
+  const k=$('#ncKind').value;
+  if(k==='event') return { code:$('#ncCamp').value.trim().toUpperCase(), name:$('#ncBrand').value.trim() };
+  const camp=$('#ncCamp').value.trim(), brand=$('#ncBrand').value.trim(), sales=$('#ncSales').value.trim(), pm=$('#ncPM').value.trim();
+  return { brand:brand, name:('Pitching'+(camp?' ('+camp+')':'')+(brand?' '+brand:'')+(sales?' '+sales:'')+(pm?' '+pm:'')).trim() };
+}
+function ncSync(){
+  const ev=$('#ncKind').value==='event';
+  $('#ncF1 label').textContent = ev?'Event code':'Campaign';
+  $('#ncCamp').placeholder = ev?'EVT-20260702':"e.g. Q2'2026 TVC";
+  $('#ncF2 label').textContent = ev?'Event name':'Brand';
+  $('#ncBrand').placeholder = ev?'e.g. UrbanLife Award 2026':'e.g. Zero Crystal';
+  $('#ncF3').style.display = ev?'none':''; $('#ncF4').style.display = ev?'none':'';
+  const n=ncName(); const pv=$('#ncPreview');
+  pv.style.display=''; pv.innerHTML = ev ? ('Project: <b>'+esc((n.code?n.code+' ':'')+n.name)+'</b> · client PressLogic')
+    : ('Project: <b>'+esc(n.name)+'</b> · comes with the 10 SOP pitching tasks (Briefing call, Deck Creation, Demo Post…)');
+}
+$('#ncToggle').onclick=function(){ const f=$('#ncForm'); const on=f.style.display==='none'; f.style.display=on?'':'none';
+  $('#ncPreview').style.display=on?'':'none'; if(on){ ncSync(); $('#ncCamp').focus(); } };
+$('#ncKind').onchange=ncSync; ['#ncCamp','#ncBrand','#ncSales','#ncPM'].forEach(function(id){ $(id).oninput=ncSync; });
+$('#ncMake').onclick=async function(){
+  if(guardRO()) return;
+  const k=$('#ncKind').value, n=ncName();
+  if(k==='event' && !/^EVT?-?\d{6,9}$/.test(n.code)) return toast('Event code looks like EVT-20260702');
+  if(!n.name) return toast(k==='event'?'Give the event a name':'Give the campaign a name');
+  const r=await sb.rpc('create_campaign',{p_kind:k,p_name:n.name,p_brand:n.brand||null,p_code:n.code||null});
+  if(r.error) return toast(friendly(r.error),true);
+  const d=r.data, sel=$('#mTarget');
+  let opt=sel.querySelector('option[value="'+d.project_id+'"]');
+  if(!opt){ opt=document.createElement('option'); opt.value=d.project_id; opt.dataset.kind=k; opt.textContent=(d.code?d.code+' · ':'')+d.name; sel.appendChild(opt); }
+  sel.value=d.project_id; syncKindUI();
+  $('#ncForm').style.display='none'; $('#ncPreview').style.display='none';
+  ['#ncCamp','#ncBrand','#ncSales','#ncPM'].forEach(function(id){ $(id).value=''; });
+  if(k==='pitching'){
+    const t=await sb.rpc('search_tasks',{q:d.name.slice(0,60),lim:60});
+    ((t.data)||[]).filter(function(x){ return x.project_id===d.project_id; }).forEach(function(x){
+      if(TASK[x.task_id]) return;
+      TASK[x.task_id]={ task_id:x.task_id, project_id:x.project_id, name:x.deliverable, client:d.name, io:null, page:null, kind:'pitching',
+        roles:['manual'], live:true, booked:false, internal:false, suggest:null };
+      S.deliverables.push(TASK[x.task_id]);
+    });
+    renderAll();
+    toast(d.existing?'That campaign already existed — its tasks are in your list':'Campaign created — pick one of its tasks and log');
+  } else {
+    toast(d.existing?'That event already existed — add work under it':'Event created — now add what you did under it');
+    $('#mName').focus();
+  }
+};
 $('#addToggle').onclick=function(){
   const f=$('#addForm'); f.classList.toggle('on');
   $('#addToggle').innerHTML=f.classList.contains('on')?'&#10005; Cancel':'&#65291; Add something that isn&rsquo;t in PACMAN';
@@ -1092,18 +1247,21 @@ $('#addToggle').onclick=function(){
 };
 $('#mMake').onclick=async function(){
   if(guardRO()) return;
-  const pid=$('#mTarget').value, nm=$('#mName').value.trim();
+  const pid=$('#mTarget').value, k=targetKind(), booking=k==='booking';
+  const kind = booking ? $('#mKind').value : null;
+  const nm = (booking && kind==='tech') ? $('#mTech').value : $('#mName').value.trim();
   if(!pid) return toast('Nothing to attach it to');
   if(!nm) return toast('Give it a name');
-  const r=await sb.rpc('create_manual_item',{p_project:pid,p_name:nm});
+  const r=await sb.rpc('create_manual_item',{p_project:pid,p_name:nm,p_kind:kind});
   if(r.error) return toast(friendly(r.error),true);
   const d=r.data, opt=$('#mTarget').selectedOptions[0];
+  const lab=opt.textContent, ioM=booking?lab.match(/^(\S+)\s+—\s+(.*)$/):null;
   TASK[d.task_id]={ task_id:d.task_id, project_id:d.project_id, name:d.name,
-    client:opt.dataset.kind==='internal'?null:opt.textContent, io:null, page:null,
-    roles:['internal'], live:true, booked:false, internal:opt.dataset.kind==='internal', suggest:null };
+    client:k==='internal'?null:(ioM?ioM[2]:lab), io:ioM?ioM[1]:null, page:null, kind:d.kind||null,
+    roles:[k==='internal'?'internal':'manual'], live:true, booked:false, internal:k==='internal', suggest:null };
   if(!S.deliverables.some(function(x){return x.task_id===d.task_id;})) S.deliverables.push(TASK[d.task_id]);
   selTask=d.task_id; selStage=null;
-  $('#mName').value=''; $('#addToggle').click();
+  $('#mName').value=''; $('#mIOpick').style.display='none'; $('#addToggle').click();
   renderAll();
   toast(d.existing?'That already existed — selected it':'Created and selected');
 };
@@ -1119,7 +1277,11 @@ function friendly(err){
   if(m.indexOf('date_mismatch')>=0) return 'Start time falls on a different day.';
   if(m.indexOf('max_16h')>=0) return 'A single entry cannot be longer than 16 hours.';
   if(m.indexOf('duration_sec')>=0) return 'An entry must be between 1 minute and 24 hours.';
-  if(m.indexOf('pm_only')>=0) return 'Only a project manager or admin can add extra items to a booking.';
+  if(m.indexOf('bad_kind')>=0) return 'Pick a type of work.';
+  if(m.indexOf('bad_event_code')>=0) return 'Event code looks like EVT-20260702.';
+  if(m.indexOf('event_pm_only')>=0) return 'Only a PM, sales admin or admin can create an event.';
+  if(m.indexOf('unknown_io')>=0) return 'That IO is not in PACMAN yet — check the number.';
+  if(m.indexOf('not_a_campaign')>=0||m.indexOf('not_an_event')>=0) return 'That is not a campaign.';
   if(m.indexOf('name_required')>=0) return 'Give it a name.';
   if(m.indexOf('row-level security')>=0) return 'You can only edit your own unlocked entries.';
   return err.message||'Could not save.';
@@ -1734,22 +1896,22 @@ function renderJobs(){
   });
   const sm=JOBS.summary||{};
   $('#jKpis').innerHTML =
-    kpi('Live items', sm.live||0, (sm.items||0)+' items in total') +
+    kpi('Live items', sm.live||0, (sm.items||0)+' items in total'+(sm.extras?' · '+sm.extras+' extra':'')) +
     kpi('Hours logged', hm(Math.round((sm.hours_range||0)*60)), fmt(JOBS.from)+' – '+fmt(JOBS.to)+' · '+(sm.entries_range||0)+' entries') +
     kpi('All-time hours', hm(Math.round((sm.hours_total||0)*60)), 'on these items, incl. Clockify history') +
     kpi('Showing', rows.length, liveOnly?'live items only':'everything');
   $('#jobsSub').textContent = (JOBS.scope==='all' ? 'Live items across every sales admin.' : 'Every item under '+(VIEW_AS?VIEW_AS.name+'\u2019s':'your')+' IOs, straight from PACMAN.')+
-    ' Hours are what editors logged (Cronus and imported Clockify). Use the arrow at the end of a row for its entries.';
+    ' Hours are what editors logged (Cronus and imported Clockify). Shaded rows are extra work added under the IO (retainer posts, tech tasks, bonus items). Use the arrow at the end of a row for its entries.';
   if(!rows.length){ $('#jBody').innerHTML='<tr><td colspan="9" class="jempty">Nothing matches.</td></tr>'; return; }
   $('#jBody').innerHTML = rows.map(function(j){
     const open = jobsOpen===j.task_id;
-    return '<tr class="j" data-j="'+j.task_id+'">'+
+    return '<tr class="j'+(j.extra?' x':'')+'" data-j="'+j.task_id+'">'+
       '<td class="io"><span class="iocopy">'+esc(j.io||'—')+'</span></td>'+
       '<td class="io created">'+(j.io_created?esc(j.io_created):'—')+'</td>'+
       '<td><div class="item">'+esc(j.deliverable)+'</div><div class="sub2">'+esc([j.brand,j.client].filter(Boolean).join(' · '))+
         (j.tentative?' · due '+esc(j.tentative):'')+(JOBS.scope==='all'?' · '+esc(j.sales_admin||''):'')+'</div></td>'+
-      '<td>'+jobStatusPill(j.status)+'</td>'+
-      '<td class="ed">'+(j.editors?esc(j.editors):'<span style="color:var(--axis)">unassigned</span>')+'</td>'+
+      '<td>'+(j.extra?'<span class="pillj">'+esc(KIND_LAB[j.kind]||'Extra')+'</span>':jobStatusPill(j.status))+'</td>'+
+      '<td class="ed">'+(j.editors?esc(j.editors):(j.extra?'<span style="color:var(--axis)">no time yet</span>':'<span style="color:var(--axis)">unassigned</span>'))+'</td>'+
       '<td class="h'+(j.hours_range?'':' zero')+'">'+hm(Math.round(j.hours_range*60))+'</td>'+
       '<td class="h'+(j.hours_total?'':' zero')+'">'+hm(Math.round(j.hours_total*60))+'</td>'+
       '<td class="last">'+(j.last?fmt(j.last):'—')+'</td>'+
@@ -1775,6 +1937,48 @@ async function loadJobEntries(taskId){
 }
 $('#jRun').onclick=loadJobs;
 $('#jScope').onchange=loadJobs;
+let jView='items', CAMPS=null;
+$$('.jview button').forEach(function(b){ b.onclick=function(){
+  $$('.jview button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); jView=b.dataset.jv;
+  $('#jItems').style.display = jView==='items'?'':'none'; $('#jFilters').style.display = jView==='items'?'':'none'; $('#jCamp').style.display = jView==='camp'?'':'none';
+  if(jView==='camp' && !CAMPS) loadCamps(); }; });
+async function loadCamps(){
+  $('#campBody').innerHTML='<tr><td colspan="10" class="jempty">Loading…</td></tr>';
+  const r=await sb.rpc('campaign_list',{p_include_archived:$('#campArch').value==='1'});
+  if(r.error){ $('#campBody').innerHTML='<tr><td colspan="10" class="jempty">'+esc(friendly(r.error))+'</td></tr>'; return; }
+  CAMPS=r.data||[]; renderCamps();
+}
+function renderCamps(){
+  const rows=CAMPS||[];
+  if(!rows.length){ $('#campBody').innerHTML='<tr><td colspan="10" class="jempty">No pitching campaigns or events yet. Anyone can start one from Log time → “Add something that isn’t in PACMAN”.</td></tr>'; return; }
+  $('#campBody').innerHTML=rows.map(function(c){
+    const ev=c.kind==='event';
+    const ioCell = ev
+      ? '<div class="ios">'+(c.ios||[]).map(function(io){ return '<span>'+esc(io)+(VIEW_AS?'':' <a href="#" data-rmio="'+esc(io)+'" data-p="'+c.project_id+'" title="Remove" style="color:var(--crit);text-decoration:none">×</a>')+'</span>'; }).join('')+
+        (VIEW_AS?'':'<div class="lk" style="margin-top:4px"><input placeholder="add IO" data-addio="'+c.project_id+'"><button data-addbtn="'+c.project_id+'">Add</button></div>')+'</div>'
+      : (c.linked_io ? '<span class="iocopy" style="font-family:var(--mono)">'+esc(c.linked_io)+'</span> <span class="pillj done">deal closed</span>'+(VIEW_AS?'':' <button class="tbtn sm" data-unlink="'+c.project_id+'">unlink</button>')
+                     : (VIEW_AS?'<span class="mini">not linked</span>':'<div class="lk"><input placeholder="IO when closed" data-linkio="'+c.project_id+'"><button data-linkbtn="'+c.project_id+'">Link</button></div>'));
+    return '<tr class="j'+(c.archived?' x':'')+'">'+
+      '<td><span class="pillj '+(ev?'':'live')+'">'+(ev?'Event':'Pitching')+'</span></td>'+
+      '<td><div class="item">'+esc(c.name)+'</div><div class="sub2">'+(c.created_by?'by '+esc(c.created_by):'')+(c.archived?' · archived':'')+'</div></td>'+
+      '<td>'+esc(c.brand||(ev?'PressLogic':'—'))+'</td>'+
+      '<td>'+ioCell+'</td>'+
+      '<td class="h">'+(c.tasks||0)+'</td>'+
+      '<td class="h'+(c.hours_month?'':' zero')+'">'+hm(Math.round((c.hours_month||0)*60))+'</td>'+
+      '<td class="h'+(c.hours?'':' zero')+'">'+hm(Math.round((c.hours||0)*60))+'</td>'+
+      '<td class="h">'+(c.people||0)+'</td>'+
+      '<td class="last">'+(c.last?fmt(c.last):'—')+'</td>'+
+      '<td class="tg">'+(VIEW_AS?'':'<button class="tbtn sm" data-arch="'+c.project_id+'" data-to="'+(c.archived?'0':'1')+'">'+(c.archived?'Restore':'Archive')+'</button>')+'</td></tr>';
+  }).join('');
+  async function act(fn,args,ok){ if(guardRO()) return; const r=await sb.rpc(fn,args); if(r.error) return toast(friendly(r.error),true); toast(ok); loadCamps(); }
+  $$('#campBody [data-linkbtn]').forEach(function(b){ b.onclick=function(){ const v=$('#campBody input[data-linkio="'+b.dataset.linkbtn+'"]').value.trim(); if(!v) return toast('Type the IO number'); act('link_campaign',{p_project:b.dataset.linkbtn,p_io:v},'Linked — its hours now count under '+v.toUpperCase()); }; });
+  $$('#campBody [data-unlink]').forEach(function(b){ b.onclick=function(){ act('link_campaign',{p_project:b.dataset.unlink,p_io:null},'Unlinked'); }; });
+  $$('#campBody [data-addbtn]').forEach(function(b){ b.onclick=function(){ const v=$('#campBody input[data-addio="'+b.dataset.addbtn+'"]').value.trim(); if(!v) return toast('Type the IO number'); act('event_io_set',{p_project:b.dataset.addbtn,p_io:v,p_on:true},'IO added to the event'); }; });
+  $$('#campBody [data-rmio]').forEach(function(a){ a.onclick=function(e){ e.preventDefault(); act('event_io_set',{p_project:a.dataset.p,p_io:a.dataset.rmio,p_on:false},'IO removed'); }; });
+  $$('#campBody [data-arch]').forEach(function(b){ b.onclick=function(){ act('campaign_archive',{p_project:b.dataset.arch,p_archived:b.dataset.to==='1'},b.dataset.to==='1'?'Archived':'Restored'); }; });
+  $$('#campBody input').forEach(function(i){ i.onkeydown=function(e){ if(e.key==='Enter'){ const btn=i.parentElement.querySelector('button'); if(btn) btn.click(); } }; });
+}
+$('#campRun').onclick=loadCamps; $('#campArch').onchange=loadCamps;
 $('#jLive').onchange=renderJobs;
 $('#jQ').oninput=renderJobs;
 
@@ -1860,6 +2064,96 @@ function renderReport(){
   if(rTab==='detailed') return renderDetailed(rows);
   if(rTab==='weekly')   return renderWeekly(rows);
   if(rTab==='audit')    return renderAudit(rows);
+  if(rTab==='monthly')  return renderMonthly(rows);
+}
+/* ---- Monthly (Finance): Clockify's Summary-by-project, done properly ---- */
+let moOpen={}, moMonth=null;
+function monthRange(ym){ const f=ym+'-01'; const nx=ym.slice(0,4)+'-'+pad(+ym.slice(5,7)+1); const nf=(+ym.slice(5,7)===12)?((+ym.slice(0,4)+1)+'-01-01'):(nx+'-01'); return [f, shift(nf,-1)]; }
+async function runMonthly(){
+  const ym=$('#moPick')?$('#moPick').value:moMonth; if(!ym) return;
+  moMonth=ym; const r=monthRange(ym); $('#rFrom').value=r[0]; $('#rTo').value=r[1];
+  $('#rRound').value='0|exact'; $('#rQuick').value='';
+  await runReport();
+}
+function moGroups(rows, keyFn, labFn){
+  const g={};
+  rows.forEach(function(e){ const k=keyFn(e); if(k==null) return;
+    if(!g[k]) g[k]={key:k, lab:labFn(e), mins:0, amount:0, n:0, people:{}, tasks:{}, kinds:{}, brand:e.brand, client:e.client, sa:e.sales_admin};
+    const x=g[k]; x.mins+=e.mins; x.amount+=(e.amount||0); x.n++; x.tasks[e.task_id]=1;
+    x.kinds[e.kind]=(x.kinds[e.kind]||0)+e.mins;
+    const pp=x.people[e.user_id]||(x.people[e.user_id]={name:e.user,mins:0,amount:0}); pp.mins+=e.mins; pp.amount+=(e.amount||0);
+  });
+  return Object.keys(g).map(function(k){ return g[k]; }).sort(function(a,b){ return b.mins-a.mins; });
+}
+function renderMonthly(rows){
+  const a=REP.can_see_amounts, from=$('#rFrom').value, to=$('#rTo').value;
+  const ym = (moMonth && monthRange(moMonth)[0]===from) ? moMonth : from.slice(0,7);
+  const booked = rows.filter(function(e){ return e.io_eff && (e.kind==='line_item'||e.kind==='extra'||e.kind==='pitching'); });
+  const pitchOpen = rows.filter(function(e){ return e.kind==='pitching' && !e.io_eff; });
+  const events = rows.filter(function(e){ return e.kind==='event'; });
+  const internal = rows.filter(function(e){ return e.kind==='internal' || e.kind==='manual'; });
+  const tot=function(list){ return list.reduce(function(s,e){ return s+e.mins; },0); };
+  const amt=function(list){ return list.reduce(function(s,e){ return s+(e.amount||0); },0); };
+  function table(list, groups, opts){
+    if(!groups.length) return '<p class="note" style="margin:0 0 6px">Nothing in '+ym+'.</p>';
+    const cols=(opts.cols||[]);
+    return '<div class="tblwrap"><table><thead><tr>'+cols.map(function(c){ return '<th'+(c.n?' class="n"':'')+'>'+c.h+'</th>'; }).join('')+
+      '<th class="n">People</th><th class="n">Hours</th>'+(a?'<th class="n">Amount HKD</th>':'')+'<th class="n">Share</th></tr></thead><tbody>'+
+      groups.map(function(g){
+        const open=!!moOpen[opts.id+g.key];
+        const kinds=!opts.tags?'':Object.keys(g.kinds).filter(function(k){ return k!=='line_item' && g.kinds[k]>0; })
+          .map(function(k){ return '<span class="tag">'+esc({extra:'extra work',pitching:'pitching',event:'event',internal:'internal',manual:'manual'}[k]||k)+' '+hm(g.kinds[k])+'</span>'; }).join('');
+        const people=Object.keys(g.people).map(function(id){ return g.people[id]; }).sort(function(x,y){ return y.mins-x.mins; });
+        return '<tr class="grp" data-g="'+esc(opts.id+g.key)+'">'+cols.map(function(c){ return '<td'+(c.n?' class="n"':'')+'>'+c.f(g)+'</td>'; }).join('')+
+          '<td class="n">'+people.length+'</td><td class="n"><b>'+hm(g.mins)+'</b></td>'+(a?'<td class="n"><b>'+money(g.amount).replace('HKD ','')+'</b></td>':'')+
+          '<td class="n">'+(list.length?Math.round(g.mins/tot(list)*100):0)+'%</td></tr>'+
+          (kinds?'<tr class="sub"><td colspan="'+(cols.length+4)+'">'+kinds+'</td></tr>':'')+
+          (open?people.map(function(p){ return '<tr class="sub"><td colspan="'+cols.length+'" style="padding-left:28px">'+esc(p.name)+'</td><td></td><td class="n">'+hm(p.mins)+'</td>'+(a?'<td class="n">'+money(p.amount).replace('HKD ','')+'</td>':'')+'<td></td></tr>'; }).join(''):'');
+      }).join('')+
+      '</tbody><tfoot><tr>'+cols.map(function(c,i){ return '<td>'+(i===0?'<b>Total</b>':'')+'</td>'; }).join('')+
+      '<td class="n">'+Object.keys(list.reduce(function(m,e){ m[e.user_id]=1; return m; },{})).length+'</td><td class="n"><b>'+hm(tot(list))+'</b></td>'+(a?'<td class="n"><b>'+money(amt(list)).replace('HKD ','')+'</b></td>':'')+'<td></td></tr></tfoot></table></div>';
+  }
+  const ioCols=[{h:'IO',f:function(g){ return '<span class="iocopy" style="font-family:var(--mono)">'+esc(g.key)+'</span>'; }},
+    {h:'Brand · client',f:function(g){ return esc([g.brand,g.client].filter(Boolean).join(' · ')||'—'); }},
+    {h:'Sales admin',f:function(g){ return esc(g.sa||'—'); }},
+    {h:'Items',n:true,f:function(g){ return Object.keys(g.tasks).length; }}];
+  const projCols=[{h:'Campaign / project',f:function(g){ return esc(g.lab); }},
+    {h:'Brand',f:function(g){ return esc(g.brand||g.client||'—'); }},
+    {h:'Tasks',n:true,f:function(g){ return Object.keys(g.tasks).length; }}];
+  const months=[]; for(let i=0;i<14;i++){ const d=new Date(+S.today.slice(0,4), +S.today.slice(5,7)-1-i, 1); months.push(d.getFullYear()+'-'+pad(d.getMonth()+1)); }
+  $('#rBody').innerHTML='<div class="mo">'+
+    '<div class="card2" style="margin-bottom:12px"><div class="mobar">'+
+      '<div class="fld"><label>Month</label><select id="moPick">'+months.map(function(m){ return '<option value="'+m+'"'+(m===ym?' selected':'')+'>'+m+'</option>'; }).join('')+'</select></div>'+
+      '<button class="add" id="moRun">Run month</button>'+
+      '<button class="tbtn" id="moCsv">&#8681; CSV by IO &times; person</button>'+
+      '<span class="mini" style="margin-left:auto">'+fmt(from)+' – '+fmt(to)+' · exact durations · '+rows.length+' entries'+(a?'':' · amounts hidden (admin only)')+'</span></div>'+
+      '<p class="note" style="margin:6px 0 0">The Cronus version of Clockify\u2019s Summary report grouped by project: every IO with the hours logged on it and, for admins, hours \u00d7 each person\u2019s rate. Pitching campaigns already linked to an IO are counted under that IO (tagged). Click a row for the people behind it.</p></div>'+
+    '<div class="sect"><h3>A · Booked work, by IO</h3><span class="mini">'+hm(tot(booked))+(a?' · '+money(amt(booked)):'')+'</span></div>'+
+    table(booked, moGroups(booked,function(e){ return e.io_eff; },function(e){ return e.io_eff; }), {id:'io', cols:ioCols, tags:true})+
+    '<div class="sect"><h3>B · Pitching not yet linked to an IO</h3><span class="mini">'+hm(tot(pitchOpen))+(a?' · '+money(amt(pitchOpen)):'')+' · link from Jobs → Pitching &amp; events when the deal closes</span></div>'+
+    table(pitchOpen, moGroups(pitchOpen,function(e){ return e.project_id; },function(e){ return e.project; }), {id:'pi', cols:projCols})+
+    '<div class="sect"><h3>C · Internal events</h3><span class="mini">'+hm(tot(events))+(a?' · '+money(amt(events)):'')+'</span></div>'+
+    table(events, moGroups(events,function(e){ return e.project_id; },function(e){ return (e.event_code?e.event_code+' ':'')+e.project; }), {id:'ev', cols:projCols})+
+    '<div class="sect"><h3>D · Internal &amp; other work without an IO</h3><span class="mini">'+hm(tot(internal))+(a?' · '+money(amt(internal)):'')+'</span></div>'+
+    table(internal, moGroups(internal,function(e){ return e.project_id; },function(e){ return e.project; }), {id:'in', cols:projCols})+
+    '</div>';
+  $('#moRun').onclick=runMonthly;
+  $('#moPick').onchange=runMonthly;
+  $$('#rBody tr.grp').forEach(function(tr){ tr.onclick=function(e){ if(e.target.closest('.iocopy')) return; const k=tr.dataset.g; moOpen[k]=!moOpen[k]; renderMonthly(rows); }; });
+  $('#moCsv').onclick=function(){
+    const secOf=function(e){ return (e.io_eff&&(e.kind==='line_item'||e.kind==='extra'||e.kind==='pitching'))?'A Booked':e.kind==='pitching'?'B Pitching':e.kind==='event'?'C Event':'D Internal'; };
+    const m={};
+    rows.forEach(function(e){ const k=[secOf(e),e.io_eff||e.project,e.user_id].join('|');
+      if(!m[k]) m[k]={sec:secOf(e),io:e.io_eff||'',proj:e.project||'',brand:e.brand||'',client:e.client||'',sa:e.sales_admin||'',user:e.user,mins:0,amount:0,kinds:{}};
+      m[k].mins+=e.mins; m[k].amount+=(e.amount||0); m[k].kinds[e.kind]=1; });
+    const head=['Month','Section','IO','Project','Brand','Client','Sales admin','Person','Hours'].concat(a?['Amount HKD']:[]).concat(['Work types']);
+    const lines=[head.join(',')].concat(Object.keys(m).sort().map(function(k){ const x=m[k];
+      const r=[ym,x.sec,x.io,x.proj,x.brand,x.client,x.sa,x.user,(x.mins/60).toFixed(2)]; if(a) r.push(x.amount.toFixed(2)); r.push(Object.keys(x.kinds).join(' ')); return r.map(csvCell).join(','); }));
+    const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob), el=document.createElement('a');
+    el.href=url; el.download='cronus-monthly-'+ym+'.csv'; document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(url);
+    toast('Exported '+(lines.length-1)+' rows for '+ym);
+  };
 }
 function rankHTML(list,total,showAmt){
   if(!list.length) return '<p class="note" style="margin:0">Nothing in range.</p>';
@@ -1977,7 +2271,9 @@ $('#rQuick').onchange=function(){ if(!this.value) return; const r=rangeFor(this.
   $('#rFrom').value=r[0]; $('#rTo').value=r[1]; runReport(); };
 $$('.rtab').forEach(function(b){ b.onclick=function(){
   $$('.rtab').forEach(function(x){x.classList.remove('on');}); b.classList.add('on');
-  rTab=b.dataset.r; renderReport(); }; });
+  rTab=b.dataset.r;
+  if(rTab==='monthly'){ if(!moMonth){ const r=rangeFor('lastmonth'); moMonth=r[0].slice(0,7); } runMonthly(); return; }
+  renderReport(); }; });
 
 /* ================= DASHBOARD ================= */
 async function runDash(){
