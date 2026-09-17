@@ -1739,7 +1739,16 @@ function weekRows(){
   ENTRIES.forEach(function(e){ if(days.indexOf(e.date)>=0&&used.indexOf(e.task_id)<0) used.push(e.task_id); });
   const rest=S.deliverables.filter(function(d){return d.live&&used.indexOf(d.task_id)<0;})
     .slice(0,Math.max(0,8-used.length)).map(function(d){return d.task_id;});
-  return used.concat(rest).filter(function(id){return TASK[id];});
+  // same order as My deliverables (the global rule: live → newest IO → IO → item); anything logged from a search goes after, newest IO first
+  const rank={}; S.deliverables.forEach(function(d,i){ rank[d.task_id]=i; });
+  return used.concat(rest).filter(function(id){return TASK[id];}).sort(function(a,b){
+    const ra=rank[a], rb=rank[b];
+    if(ra!=null&&rb!=null) return ra-rb;
+    if(ra!=null) return -1; if(rb!=null) return 1;
+    const ia=TASK[a].io||'', ib=TASK[b].io||'';
+    if(ia!==ib) return ia>ib?-1:1;
+    return (TASK[a].name||'')<(TASK[b].name||'')?-1:1;
+  });
 }
 const cellMins=(task,date)=>ENTRIES.filter(function(e){return e.task_id===task&&e.date===date;})
   .reduce(function(a,e){return a+e.mins;},0);
