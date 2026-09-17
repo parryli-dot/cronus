@@ -96,6 +96,8 @@
   .dur.warn { color:var(--warn-text); }
   .add { border:0; border-radius:8px; padding:10px 20px; font-weight:650; color:#fff; background:var(--booked); }
   .add:disabled { background:var(--axis); cursor:not-allowed; }
+  .add.done { background:var(--good-text); transition:background .2s; }
+  .add.done:disabled { background:var(--good-text); cursor:default; }
   .kb { font-size:11.5px; color:var(--muted); padding:0 12px 10px; }
   .kb kbd { font-size:11px; border:1px solid var(--line); border-bottom-width:2px; border-radius:4px;
     padding:0 4px; background:var(--surface); }
@@ -1070,7 +1072,7 @@ function paintBar(){
   const out=$('#durOut');
   out.className='dur'+(mins!==null&&mins>720?' warn':'');
   out.textContent = mins===null ? '—' : (mins<=0 ? 'no time in between' : hm(mins)+(crossesDay(tt.a,tt.b)?' · ends next day':''));
-  $('#addBtn').disabled = !(selTask && mins>0 && !(stageRequired()&&!sid));
+  $('#addBtn').disabled = $('#addBtn').classList.contains('done') || !(selTask && mins>0 && !(stageRequired()&&!sid));
   $('#calSel').textContent = selTask ? ('Dragging will log: '+TASK[selTask].name) : 'Pick a deliverable first — drag then fills it in.';
   paintGuard(mins,tt.a);
 }
@@ -1348,6 +1350,8 @@ function tryAdd(){
   const mins=spanMins(tt.a,tt.b);   // finish earlier than start = finished the next day
   if(mins<=0) return toast('Start and finish are the same time');
   if(stageRequired()&&!effStage()) return toast('This is booked work — it needs a stage');
+  const dup=ENTRIES.filter(function(e){ return e.task_id===selTask && e.date===selDate && e.start===t2s(tt.a) && e.end===t2s(tt.b); })[0];
+  if(dup){ toast('Already logged: '+dup.start+'–'+dup.end+' on this deliverable '+(selDate===S.today?'today':fmt(selDate))+'. Change the time, or use ✎ on the existing one.',true); return; }
   const row={ id:tempId(), task_id:selTask, project_id:TASK[selTask].project_id, date:selDate,
               mins:mins, start:t2s(tt.a), end:t2s(tt.b), stage:effStage(),
               note:$('#desc').value.trim(), source:'manual', locked:false, _p:true };
@@ -1363,9 +1367,14 @@ async function commit(row){
   const saved=await insertEntry(row);
   if(saved){ Object.assign(row,saved); delete row._p;
     if(TASK[row.task_id]&&TASK[row.task_id].booked) fetchSuggest(row.task_id);
-    lastAdded=row.id; showSaved(row); }
+    lastAdded=row.id; showSaved(row); flashAddBtn(row); }
   else ENTRIES=ENTRIES.filter(function(e){return e!==row;});
   renderAll();
+}
+let addBtnTimer=null;
+function flashAddBtn(row){
+  const b=$('#addBtn'); b.classList.add('done'); b.textContent='\u2713 Added '+hm(row.mins); b.disabled=true;
+  clearTimeout(addBtnTimer); addBtnTimer=setTimeout(function(){ b.classList.remove('done'); b.textContent='Add'; paintBar(); },2200);
 }
 /* after Add: a green strip under the bar says what was saved, with Undo and Show; the new row also flashes in the day list */
 let lastAdded=null, savedTimer=null;
