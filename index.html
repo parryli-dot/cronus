@@ -951,6 +951,8 @@ function goPanel(k){
    person's deliverables and hours read-only (bootstrap_as, admin-only on the server).
    Available to every admin: previewing what a colleague sees is part of the admin job.     */
 let REAL_ME=null, VIEW_AS=null, ROLE_VIEW='admin', pvWired=false;
+// who the previewed person can see: themselves plus their manager_scope (Dashboard and Reports in preview use this, not just the person alone)
+function pvScope(){ return [S.me.id].concat((S.team||[]).map(function(u){return u.id;})); }
 function guardRO(){ if(VIEW_AS){ toast('Preview is read only — exit the preview to make changes'); return true; } return false; }
 function setupPreviewTools(){
   const ok = !!(REAL_ME && REAL_ME.is_admin);
@@ -2080,7 +2082,7 @@ function fillRepFilters(){
     if(res.error) return;
     $('#rUser').innerHTML='<option value="">Everyone I can see ('+(res.data||[]).length+')</option>'+
       (res.data||[]).map(function(u){ return '<option value="'+u.user_id+'">'+esc(u.name)+'</option>'; }).join('');
-    if(VIEW_AS){ $('#rUser').value=VIEW_AS.id; $('#repSub').textContent='Preview: filtered to '+VIEW_AS.name+' (your admin scope still applies).'; return; }
+    if(VIEW_AS){ const n=pvScope().length; $('#rUser').value=n>1?'':VIEW_AS.id; $('#repSub').textContent='Preview: '+VIEW_AS.name+(n>1?' and the '+(n-1)+' people in their scope':' only')+' (your admin scope still applies).'; return; }
     $('#repSub').textContent='You can report on '+(res.data||[]).length+
       (res.data.length===1?' person':' people')+(S.me.is_admin?' · amounts visible':' · amounts hidden');
   });
@@ -2091,7 +2093,7 @@ async function runReport(){
   $('#rBody').innerHTML='<div class="card2">Running…</div>';
   const rr=$('#rRound').value.split('|');
   const args={ p_from:from, p_to:to, p_round:+rr[0], p_mode:rr[1] };
-  if($('#rUser').value) args.p_users=[$('#rUser').value];
+  if($('#rUser').value) args.p_users=[$('#rUser').value]; else if(VIEW_AS) args.p_users=pvScope();
   if($('#rTag').value)  args.p_tags=[$('#rTag').value];
   if($('#rQ').value.trim()) args.p_q=$('#rQ').value.trim();
   const r=await sb.rpc('report_data',args);
@@ -2376,7 +2378,7 @@ $$('.rtab').forEach(function(b){ b.onclick=function(){
 async function runDash(){
   const r=rangeFor($('#dRange').value);
   const rr=($('#rRound')?$('#rRound').value:'15|up').split('|');
-  const dargs={p_from:r[0],p_to:r[1],p_round:+rr[0],p_mode:rr[1]}; if(VIEW_AS) dargs.p_users=[S.me.id];
+  const dargs={p_from:r[0],p_to:r[1],p_round:+rr[0],p_mode:rr[1]}; if(VIEW_AS) dargs.p_users=pvScope();
   const res=await sb.rpc('report_data',dargs);
   if(res.error) return toast(friendly(res.error),true);
   const rows=res.data.rows||[], tot=rows.reduce(function(a,e){return a+e.mins;},0);
