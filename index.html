@@ -103,6 +103,16 @@
     color:var(--warn-text); font-size:13px; align-items:center; gap:10px; flex-wrap:wrap; }
   .guard.on { display:flex; }
   .guard.hard { background:#FEF2F2; color:var(--crit); }
+  .saved { display:none; padding:10px 12px; border-top:1px solid var(--line); background:#F0FDF4; color:var(--good-text);
+    font-size:13.5px; align-items:center; gap:10px; flex-wrap:wrap; }
+  .saved.on { display:flex; animation:savedin .25s ease-out; }
+  .saved b { font-family:var(--mono); }
+  .saved .sp { flex:1; }
+  .saved button { border:1px solid #BBF7D0; background:var(--raised); color:var(--good-text); border-radius:7px; padding:5px 10px; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .saved button:hover { background:#DCFCE7; }
+  @keyframes savedin { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+  .e.flash { animation:flash 2.4s ease-out; }
+  @keyframes flash { 0%,35% { background:#DCFCE7; box-shadow:0 0 0 2px #86EFAC inset; } 100% { background:transparent; box-shadow:none; } }
   .guard button { border:1px solid currentColor; background:transparent; border-radius:7px;
     padding:5px 11px; font-size:12.5px; font-weight:650; }
 
@@ -533,6 +543,7 @@
         <div class="kb">Finish accepts a time (<kbd>11:00</kbd>) or a length (<kbd>1.5</kbd>, <kbd>90m</kbd>) &middot;
           <kbd>&larr;</kbd> <kbd>&rarr;</kbd> change day &middot; <kbd>Enter</kbd> saves</div>
         <div class="guard" id="guard"></div>
+        <div class="saved" id="saved"></div>
       </div>
 
       <div class="drawer">
@@ -1352,9 +1363,22 @@ async function commit(row){
   const saved=await insertEntry(row);
   if(saved){ Object.assign(row,saved); delete row._p;
     if(TASK[row.task_id]&&TASK[row.task_id].booked) fetchSuggest(row.task_id);
-    toast(hm(row.mins)+' logged on '+fmt(row.date)); }
+    lastAdded=row.id; showSaved(row); }
   else ENTRIES=ENTRIES.filter(function(e){return e!==row;});
   renderAll();
+}
+/* after Add: a green strip under the bar says what was saved, with Undo and Show; the new row also flashes in the day list */
+let lastAdded=null, savedTimer=null;
+function showSaved(row){
+  const t=TASK[row.task_id]||{name:''}; const box=$('#saved');
+  box.innerHTML='<span>&#10003; Saved <b>'+hm(row.mins)+'</b>'+(row.start?' · '+esc(row.start)+'–'+esc(row.end):'')+' · '+esc(t.name)+
+    ' · '+(row.date===S.today?'today':fmt(row.date))+' now <b>'+hm(totalFor(row.date))+'</b></span><span class="sp"></span>'+
+    '<button id="savedShow">Show it</button><button id="savedUndo">Undo</button>';
+  box.className='saved on';
+  $('#savedShow').onclick=function(){ const el=document.querySelector('#days .e[data-eid="'+row.id+'"]'); if(!el) return;
+    el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); };
+  $('#savedUndo').onclick=async function(){ box.className='saved'; lastAdded=null; const ok=await removeEntry(row); if(ok) toast('Removed'); };
+  clearTimeout(savedTimer); savedTimer=setTimeout(function(){ box.className='saved'; lastAdded=null; },10000);
 }
 
 /* ---------- day list ---------- */
@@ -1404,7 +1428,7 @@ function entryHTML(e){
   const when = e.start&&e.end ? '<span class="when">'+e.start+'–'+e.end+
                                 (crossesDay(parseTime(e.start),parseTime(e.end))?'<span class="nd" title="Finished the next day">+1</span>':'')+'</span>'
                               : '<span class="when none">no time set</span>';
-  return '<div class="e '+(e._p?'pending':'')+'">'+
+  return '<div class="e '+(e._p?'pending':'')+(String(e.id)===String(lastAdded)?' flash':'')+'" data-eid="'+e.id+'">'+
     '<span class="bar '+(t.booked?'':'ub')+'"></span>'+
     '<div><div class="t1">'+(e.note?esc(e.note):'<span class="ph">No note</span>')+'</div>'+
     '<div class="t2">'+esc(t.name)+(t.client?' &mdash; '+esc(t.client):'')+'</div></div>'+
@@ -1779,7 +1803,7 @@ $('#copyLast').onclick=async function(){
 };
 
 /* ---------- wiring ---------- */
-$('#dPrev').onclick=function(){ selDate=shift(selDate,-1); resetTimes(); renderAll(); };
+$('#dPrev').onclick=function(){ selDate=shift(selDate,-1); resetTimes(); $('#saved').className='saved'; renderAll(); };
 $('#dNext').onclick=function(){ if(selDate<S.today){ selDate=shift(selDate,1); resetTimes(); renderAll(); } else toast('No logging into the future'); };
 $$('.quick[data-jump]').forEach(function(b){ b.onclick=function(){
   selDate=b.dataset.jump==='fri'?lastFriday():shift(S.today,+b.dataset.jump); resetTimes(); renderAll(); }; });
