@@ -1073,6 +1073,7 @@ function paintBar(){
   out.className='dur'+(mins!==null&&mins>720?' warn':'');
   out.textContent = mins===null ? '—' : (mins<=0 ? 'no time in between' : hm(mins)+(crossesDay(tt.a,tt.b)?' · ends next day':''));
   $('#addBtn').disabled = $('#addBtn').classList.contains('done') || !(selTask && mins>0 && !(stageRequired()&&!sid));
+  $('#addBtn').title = !selTask ? 'Pick a deliverable first' : (stageRequired()&&!sid) ? 'Booked work needs a stage — click the Stage chip' : !(mins>0) ? 'Fill in the times' : '';
   $('#calSel').textContent = selTask ? ('Dragging will log: '+TASK[selTask].name) : 'Pick a deliverable first — drag then fills it in.';
   paintGuard(mins,tt.a);
 }
@@ -1829,8 +1830,9 @@ $('#desc').onkeydown=function(e){ if(e.key==='Enter') tryAdd(); };
 $('#addBtn').onclick=tryAdd;
 $$('.dtab').forEach(function(b){ b.onclick=function(){
   $$('.dtab').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); dTab=b.dataset.d;
-  $('#dsearch').placeholder = dTab==='all'?'Search all bookings...':'Filter your deliverables...';
-  renderRows(); }; });
+  $('#dsearch').value=''; searchRows=[];
+  $('#dsearch').placeholder = dTab==='all'?'Search all bookings...':dTab==='recent'?'Filter recent...':'Filter your deliverables...';
+  renderRows(); if(dTab==='all') $('#dsearch').focus(); }; });
 document.addEventListener('keydown',function(e){
   if(e.target.matches('input,select,textarea')||!S) return;
   if(!$('#p-log').classList.contains('on')) return;
