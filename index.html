@@ -1226,15 +1226,16 @@ $('#ncMake').onclick=async function(){
   $('#ncForm').style.display='none'; $('#ncPreview').style.display='none';
   ['#ncCamp','#ncBrand','#ncSales','#ncPM'].forEach(function(id){ $(id).value=''; });
   if(k==='pitching'){
-    const t=await sb.rpc('search_tasks',{q:d.name.slice(0,60),lim:60});
-    ((t.data)||[]).filter(function(x){ return x.project_id===d.project_id; }).forEach(function(x){
+    const lab=(d.code?d.code+' · ':'')+d.name;
+    (d.task_list||[]).forEach(function(x){
       if(TASK[x.task_id]) return;
-      TASK[x.task_id]={ task_id:x.task_id, project_id:x.project_id, name:x.deliverable, client:d.name, io:null, page:null, kind:'pitching',
+      TASK[x.task_id]={ task_id:x.task_id, project_id:d.project_id, name:x.name, client:lab, io:null, page:null, kind:'pitching',
         roles:['manual'], live:true, booked:false, internal:false, suggest:null };
       S.deliverables.push(TASK[x.task_id]);
     });
     renderAll();
-    toast(d.existing?'That campaign already existed — its tasks are in your list':'Campaign created — pick one of its tasks and log');
+    const first=(d.task_list||[])[0]; if(first){ selTask=first.task_id; selStage=null; renderRows(); paintBar(); }
+    toast(d.existing?'That campaign already existed — its tasks are in your list':'Campaign created — its 10 tasks are in your list, first one selected');
   } else {
     toast(d.existing?'That event already existed — add work under it':'Event created — now add what you did under it');
     $('#mName').focus();
@@ -1278,6 +1279,7 @@ function friendly(err){
   if(m.indexOf('max_16h')>=0) return 'A single entry cannot be longer than 16 hours.';
   if(m.indexOf('duration_sec')>=0) return 'An entry must be between 1 minute and 24 hours.';
   if(m.indexOf('bad_kind')>=0) return 'Pick a type of work.';
+  if(m.indexOf('locked_entry')>=0) return 'This entry was locked at month close — ask an admin to unlock it.';
   if(m.indexOf('bad_event_code')>=0) return 'Event code looks like EVT-20260702.';
   if(m.indexOf('event_pm_only')>=0) return 'Only a PM, sales admin or admin can create an event.';
   if(m.indexOf('unknown_io')>=0) return 'That IO is not in PACMAN yet — check the number.';
@@ -2067,13 +2069,20 @@ function renderReport(){
   if(rTab==='monthly')  return renderMonthly(rows);
 }
 /* ---- Monthly (Finance): Clockify's Summary-by-project, done properly ---- */
-let moOpen={}, moMonth=null;
+let moOpen={}, moMonth=null, ECON={};
 function monthRange(ym){ const f=ym+'-01'; const nx=ym.slice(0,4)+'-'+pad(+ym.slice(5,7)+1); const nf=(+ym.slice(5,7)===12)?((+ym.slice(0,4)+1)+'-01-01'):(nx+'-01'); return [f, shift(nf,-1)]; }
 async function runMonthly(){
   const ym=$('#moPick')?$('#moPick').value:moMonth; if(!ym) return;
   moMonth=ym; const r=monthRange(ym); $('#rFrom').value=r[0]; $('#rTo').value=r[1];
   $('#rRound').value='0|exact'; $('#rQuick').value='';
   await runReport();
+  if(!REP || !(S.me.is_admin || S.isSalesAdmin)) return;
+  const ios=Object.keys((REP.rows||[]).reduce(function(m,e){ if(e.io_eff) m[e.io_eff]=1; return m; },{}));
+  if(!ios.length){ ECON={}; return; }
+  const ec=await sb.rpc('io_economics',{p_ios:ios});
+  if(ec.error){ toast(friendly(ec.error),true); return; }
+  ECON={}; (ec.data||[]).forEach(function(x){ ECON[x.io]=x; });
+  if(rTab==='monthly') renderMonthly(REP.rows||[]);
 }
 function moGroups(rows, keyFn, labFn){
   const g={};
@@ -2098,7 +2107,7 @@ function renderMonthly(rows){
     if(!groups.length) return '<p class="note" style="margin:0 0 6px">Nothing in '+ym+'.</p>';
     const cols=(opts.cols||[]);
     return '<div class="tblwrap"><table><thead><tr>'+cols.map(function(c){ return '<th'+(c.n?' class="n"':'')+'>'+c.h+'</th>'; }).join('')+
-      '<th class="n">People</th><th class="n">Hours</th>'+(a?'<th class="n">Amount HKD</th>':'')+'<th class="n">Share</th></tr></thead><tbody>'+
+      '<th class="n">People</th><th class="n">Hours (month)</th>'+(a?'<th class="n">Cost (month)</th>':'')+'<th class="n">Share</th></tr></thead><tbody>'+
       groups.map(function(g){
         const open=!!moOpen[opts.id+g.key];
         const kinds=!opts.tags?'':Object.keys(g.kinds).filter(function(k){ return k!=='line_item' && g.kinds[k]>0; })
@@ -2113,10 +2122,35 @@ function renderMonthly(rows){
       '</tbody><tfoot><tr>'+cols.map(function(c,i){ return '<td>'+(i===0?'<b>Total</b>':'')+'</td>'; }).join('')+
       '<td class="n">'+Object.keys(list.reduce(function(m,e){ m[e.user_id]=1; return m; },{})).length+'</td><td class="n"><b>'+hm(tot(list))+'</b></td>'+(a?'<td class="n"><b>'+money(amt(list)).replace('HKD ','')+'</b></td>':'')+'<td></td></tr></tfoot></table></div>';
   }
+  const hasEcon=Object.keys(ECON).length>0;
   const ioCols=[{h:'IO',f:function(g){ return '<span class="iocopy" style="font-family:var(--mono)">'+esc(g.key)+'</span>'; }},
     {h:'Brand · client',f:function(g){ return esc([g.brand,g.client].filter(Boolean).join(' · ')||'—'); }},
     {h:'Sales admin',f:function(g){ return esc(g.sa||'—'); }},
     {h:'Items',n:true,f:function(g){ return Object.keys(g.tasks).length; }}];
+  if(hasEcon){
+    ioCols.push({h:'Net revenue',n:true,f:function(g){ const x=ECON[g.key]; return x?money(x.revenue).replace('HKD ',''):'—'; }});
+    if(a){
+      ioCols.push({h:'Cost to date',n:true,f:function(g){ const x=ECON[g.key]; return x?money(x.cost_all).replace('HKD ',''):'—'; }});
+      ioCols.push({h:'Margin to date',n:true,f:function(g){ const x=ECON[g.key]; if(!x) return '—'; const m=x.revenue-x.cost_all; const pct=x.revenue?Math.round(m/x.revenue*100):null;
+        return '<span style="color:'+(m<0?'var(--crit)':'var(--good-text)')+'">'+money(m).replace('HKD ','')+(pct!=null?' <span class="mini">'+pct+'%</span>':'')+'</span>'; }});
+    }
+    ioCols.push({h:'Hours to date',n:true,f:function(g){ const x=ECON[g.key]; return x?hm(Math.round(x.hours_all*60)):'—'; }});
+  }
+  /* by person: this month's hours and cost, plus the revenue their hours earn — IO net revenue × their share of all hours ever logged on that IO */
+  const ppl={};
+  booked.forEach(function(e){ const x=ECON[e.io_eff]; const p=ppl[e.user_id]||(ppl[e.user_id]={name:e.user,mins:0,amount:0,rev:0,ios:{}});
+    p.mins+=e.mins; p.amount+=(e.amount||0); p.ios[e.io_eff]=1;
+    if(x && x.hours_all>0) p.rev += x.revenue * ((e.mins/60)/x.hours_all); });
+  rows.forEach(function(e){ if(e.io_eff && (e.kind==='line_item'||e.kind==='extra'||e.kind==='pitching')) return;
+    const p=ppl[e.user_id]||(ppl[e.user_id]={name:e.user,mins:0,amount:0,rev:0,ios:{}}); p.mins+=e.mins; p.amount+=(e.amount||0); });
+  const people=Object.keys(ppl).map(function(k){ return ppl[k]; }).sort(function(x,y){ return (y.rev-y.amount)-(x.rev-x.amount); });
+  const peopleHTML = !hasEcon ? '' : '<div class="sect"><h3>E · By person — effort vs revenue earned</h3><span class="mini">revenue share = IO net revenue × this person\u2019s hours on that IO ÷ all hours ever logged on it</span></div>'+
+    '<div class="tblwrap"><table><thead><tr><th>Person</th><th class="n">IOs</th><th class="n">Hours</th>'+(a?'<th class="n">Cost</th>':'')+'<th class="n">Revenue share</th><th class="n">Revenue / hour</th>'+(a?'<th class="n">Revenue ÷ cost</th>':'')+'</tr></thead><tbody>'+
+    people.map(function(p){ const rph=p.mins?p.rev/(p.mins/60):0; const ratio=(a&&p.amount)?p.rev/p.amount:null;
+      return '<tr><td>'+esc(p.name)+'</td><td class="n">'+Object.keys(p.ios).length+'</td><td class="n">'+hm(p.mins)+'</td>'+(a?'<td class="n">'+money(p.amount).replace('HKD ','')+'</td>':'')+
+        '<td class="n">'+money(p.rev).replace('HKD ','')+'</td><td class="n">'+money(rph).replace('HKD ','')+'</td>'+
+        (a?'<td class="n"><b style="color:'+(ratio==null?'var(--muted)':ratio<1?'var(--crit)':'var(--good-text)')+'">'+(ratio==null?'—':ratio.toFixed(1)+'×')+'</b></td>':'')+'</tr>'; }).join('')+
+    '</tbody></table></div>';
   const projCols=[{h:'Campaign / project',f:function(g){ return esc(g.lab); }},
     {h:'Brand',f:function(g){ return esc(g.brand||g.client||'—'); }},
     {h:'Tasks',n:true,f:function(g){ return Object.keys(g.tasks).length; }}];
@@ -2128,7 +2162,8 @@ function renderMonthly(rows){
       '<button class="tbtn" id="moCsv">&#8681; CSV by IO &times; person</button>'+
       '<span class="mini" style="margin-left:auto">'+fmt(from)+' – '+fmt(to)+' · exact durations · '+rows.length+' entries'+(a?'':' · amounts hidden (admin only)')+'</span></div>'+
       '<p class="note" style="margin:6px 0 0">The Cronus version of Clockify\u2019s Summary report grouped by project: every IO with the hours logged on it and, for admins, hours \u00d7 each person\u2019s rate. Pitching campaigns already linked to an IO are counted under that IO (tagged). Click a row for the people behind it.</p></div>'+
-    '<div class="sect"><h3>A · Booked work, by IO</h3><span class="mini">'+hm(tot(booked))+(a?' · '+money(amt(booked)):'')+'</span></div>'+
+    '<div class="sect"><h3>A · Booked work, by IO</h3><span class="mini">'+hm(tot(booked))+(a?' · cost this month '+money(amt(booked)):'')+
+      (hasEcon?' · net revenue of these IOs '+money(Object.keys(ECON).reduce(function(s,k){ return s+(ECON[k].revenue||0); },0))+(a?' · cost to date '+money(Object.keys(ECON).reduce(function(s,k){ return s+(ECON[k].cost_all||0); },0)):''):'')+'</span></div>'+
     table(booked, moGroups(booked,function(e){ return e.io_eff; },function(e){ return e.io_eff; }), {id:'io', cols:ioCols, tags:true})+
     '<div class="sect"><h3>B · Pitching not yet linked to an IO</h3><span class="mini">'+hm(tot(pitchOpen))+(a?' · '+money(amt(pitchOpen)):'')+' · link from Jobs → Pitching &amp; events when the deal closes</span></div>'+
     table(pitchOpen, moGroups(pitchOpen,function(e){ return e.project_id; },function(e){ return e.project; }), {id:'pi', cols:projCols})+
@@ -2136,6 +2171,7 @@ function renderMonthly(rows){
     table(events, moGroups(events,function(e){ return e.project_id; },function(e){ return (e.event_code?e.event_code+' ':'')+e.project; }), {id:'ev', cols:projCols})+
     '<div class="sect"><h3>D · Internal &amp; other work without an IO</h3><span class="mini">'+hm(tot(internal))+(a?' · '+money(amt(internal)):'')+'</span></div>'+
     table(internal, moGroups(internal,function(e){ return e.project_id; },function(e){ return e.project; }), {id:'in', cols:projCols})+
+    peopleHTML+
     '</div>';
   $('#moRun').onclick=runMonthly;
   $('#moPick').onchange=runMonthly;
@@ -2146,9 +2182,11 @@ function renderMonthly(rows){
     rows.forEach(function(e){ const k=[secOf(e),e.io_eff||e.project,e.user_id].join('|');
       if(!m[k]) m[k]={sec:secOf(e),io:e.io_eff||'',proj:e.project||'',brand:e.brand||'',client:e.client||'',sa:e.sales_admin||'',user:e.user,mins:0,amount:0,kinds:{}};
       m[k].mins+=e.mins; m[k].amount+=(e.amount||0); m[k].kinds[e.kind]=1; });
-    const head=['Month','Section','IO','Project','Brand','Client','Sales admin','Person','Hours'].concat(a?['Amount HKD']:[]).concat(['Work types']);
-    const lines=[head.join(',')].concat(Object.keys(m).sort().map(function(k){ const x=m[k];
-      const r=[ym,x.sec,x.io,x.proj,x.brand,x.client,x.sa,x.user,(x.mins/60).toFixed(2)]; if(a) r.push(x.amount.toFixed(2)); r.push(Object.keys(x.kinds).join(' ')); return r.map(csvCell).join(','); }));
+    const head=['Month','Section','IO','Project','Brand','Client','Sales admin','Person','Hours'].concat(a?['Cost HKD']:[]).concat(['IO net revenue','IO hours to date'].concat(a?['IO cost to date']:[])).concat(['Revenue share','Work types']);
+    const lines=[head.join(',')].concat(Object.keys(m).sort().map(function(k){ const x=m[k]; const ec=ECON[x.io];
+      const r=[ym,x.sec,x.io,x.proj,x.brand,x.client,x.sa,x.user,(x.mins/60).toFixed(2)]; if(a) r.push(x.amount.toFixed(2));
+      r.push(ec?ec.revenue.toFixed(2):''); r.push(ec?ec.hours_all.toFixed(2):''); if(a) r.push(ec?(ec.cost_all||0).toFixed(2):'');
+      r.push(ec&&ec.hours_all>0?(ec.revenue*((x.mins/60)/ec.hours_all)).toFixed(2):''); r.push(Object.keys(x.kinds).join(' ')); return r.map(csvCell).join(','); }));
     const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
     const url=URL.createObjectURL(blob), el=document.createElement('a');
     el.href=url; el.download='cronus-monthly-'+ym+'.csv'; document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(url);
