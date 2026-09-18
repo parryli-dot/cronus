@@ -2107,7 +2107,7 @@ function fillRepFilters(){
     const people = (VIEW_AS&&pvScope()) ? pvPeople() : (res.data||[]);
     $('#rUser').innerHTML='<option value="">Everyone I can see ('+people.length+')</option>'+
       people.map(function(u){ return '<option value="'+u.user_id+'">'+esc(u.name)+'</option>'; }).join('');
-    if(VIEW_AS){ const n=people.length; $('#rUser').value=n>1?'':VIEW_AS.id; $('#repSub').textContent='Preview: '+VIEW_AS.name+(pvScope()?(n>1?' and the '+(n-1)+' people in their scope':' only'):' — sees everyone, like you')+'.'; return; }
+    if(VIEW_AS){ const n=people.length; $('#rUser').value=n>1?'':VIEW_AS.id; $('#repSub').textContent='Preview: '+VIEW_AS.name+(pvScope()?(n>1?' and the '+(n-1)+' people in their scope':' only'):' — sees everyone, like you')+(S.me.is_admin?' · amounts visible':' · amounts hidden')+'.'; return; }
     $('#repSub').textContent='You can report on '+(res.data||[]).length+
       (res.data.length===1?' person':' people')+(S.me.is_admin?' · amounts visible':' · amounts hidden');
   });
@@ -2123,7 +2123,8 @@ async function runReport(){
   if($('#rQ').value.trim()) args.p_q=$('#rQ').value.trim();
   const r=await sb.rpc('report_data',args);
   if(r.error){ $('#rBody').innerHTML=''; return toast(friendly(r.error),true); }
-  REP=r.data; renderReport();
+  REP=r.data; if(VIEW_AS&&!S.me.is_admin) REP.can_see_amounts=false; // preview shows what they see: amounts are admin-only
+  renderReport();
 }
 function sumBy(rows,keyFn,labelFn){
   const m={};
@@ -2406,6 +2407,7 @@ async function runDash(){
   const dargs={p_from:r[0],p_to:r[1],p_round:+rr[0],p_mode:rr[1]}; if(VIEW_AS&&pvScope()) dargs.p_users=pvScope();
   const res=await sb.rpc('report_data',dargs);
   if(res.error) return toast(friendly(res.error),true);
+  if(VIEW_AS&&!S.me.is_admin) res.data.can_see_amounts=false;
   const rows=res.data.rows||[], tot=rows.reduce(function(a,e){return a+e.mins;},0);
   const amt=rows.reduce(function(a,e){return a+(e.amount||0);},0);
   const bk=rows.filter(function(e){return e.booked;}).reduce(function(a,e){return a+e.mins;},0);
