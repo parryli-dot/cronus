@@ -739,8 +739,10 @@
           <option value="mine">My IOs</option><option value="all">All sales admins (live items)</option></select></div>
         <div class="fld"><label>Show</label><select id="jLive">
           <option value="live">Live items</option><option value="all">Everything</option><option value="published">Published only</option><option value="cancelled">Cancelled only</option></select></div>
-        <div class="fld"><label>Hours from</label><input type="date" id="jFrom"></div>
+        <div class="fld"><label>Hours logged from</label><input type="date" id="jFrom"></div>
         <div class="fld"><label>to</label><input type="date" id="jTo"></div>
+        <div class="fld"><label>IO created from</label><input type="date" id="jCFrom"></div>
+        <div class="fld"><label>to</label><input type="date" id="jCTo"></div>
         <div class="fld"><label>Search</label><input id="jQ" placeholder="IO, brand, item, editor…"></div>
         <div class="fld"><label>&nbsp;</label><button class="add" id="jRun">Refresh</button></div>
       </div>
@@ -1960,11 +1962,13 @@ function jobStatusPill(st){
 }
 function renderJobs(){
   if(!JOBS) return;
-  const q=$('#jQ').value.trim().toLowerCase(), show=$('#jLive').value, liveOnly=show==='live';
+  const q=$('#jQ').value.trim().toLowerCase(), show=$('#jLive').value, liveOnly=show==='live', cf=$('#jCFrom').value, ct=$('#jCTo').value;
   const rows=(JOBS.rows||[]).filter(function(j){
     if(liveOnly && !j.live) return false;
     if(show==='published' && j.status!=='Published') return false;
     if(show==='cancelled' && j.status!=='Cancelled') return false;
+    if(cf && (!j.io_created || j.io_created<cf)) return false;
+    if(ct && (!j.io_created || j.io_created>ct)) return false;
     if(!q) return true;
     return [j.io,j.brand,j.client,j.deliverable,j.editors,j.sales_admin].join(' ').toLowerCase().indexOf(q)>=0;
   });
@@ -2055,7 +2059,7 @@ function renderCamps(){
 }
 $('#campRun').onclick=loadCamps; $('#campArch').onchange=loadCamps;
 $('#jLive').onchange=renderJobs;
-$('#jQ').oninput=renderJobs;
+$('#jQ').oninput=renderJobs; $('#jCFrom').onchange=renderJobs; $('#jCTo').onchange=renderJobs;
 
 /* ================= FAVOURITES ================= */
 let FAVS={};
