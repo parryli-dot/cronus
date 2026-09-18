@@ -2164,6 +2164,7 @@ async function runMonthly(){
   const ym=$('#moPick')?$('#moPick').value:moMonth; if(!ym) return;
   moMonth=ym; const r=monthRange(ym); $('#rFrom').value=r[0]; $('#rTo').value=r[1];
   $('#rRound').value='0|exact'; $('#rQuick').value='';
+  ECON={}; // never paint another month's economics against this month's IOs
   await runReport();
   if(!REP || !(S.me.is_admin || S.isSalesAdmin)) return;
   const ios=Object.keys((REP.rows||[]).reduce(function(m,e){ if(e.io_eff) m[e.io_eff]=1; return m; },{}));
