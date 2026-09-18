@@ -96,6 +96,7 @@
   .dur.warn { color:var(--warn-text); }
   .add { border:0; border-radius:8px; padding:10px 20px; font-weight:650; color:#fff; background:var(--booked); }
   .add:disabled { background:var(--axis); cursor:not-allowed; }
+  .fld select:disabled { color:var(--muted); background:var(--plane); cursor:not-allowed; }
   .quick:disabled { color:var(--muted); background:var(--plane); cursor:not-allowed; opacity:.7; }
   .add.done { background:var(--good-text); transition:background .2s; }
   .add.done:disabled { background:var(--good-text); cursor:default; }
@@ -1935,7 +1936,15 @@ let JOBS=null, jobsOpen=null;
 function jobsDefaultRange(){
   const t=S.today; return [t.slice(0,8)+'01', t];
 }
+// Show = Everything only exists under My IOs: across all sales admins the server returns live items only (thousands otherwise)
+function syncShow(){
+  const all=$('#jScope').value==='all', sh=$('#jLive');
+  if(all){ sh.value='live'; }
+  sh.disabled=all;
+  sh.title=all?'Across all sales admins only live items are loaded (too many otherwise). Switch Scope to My IOs to see published and cancelled items.':'';
+}
 async function loadJobs(){
+  syncShow();
   if(!$('#jFrom').value){ const r=jobsDefaultRange(); $('#jFrom').value=r[0]; $('#jTo').value=r[1]; }
   $('#jBody').innerHTML='<tr><td colspan="9" class="jempty">Loading…</td></tr>';
   const args={ p_scope:$('#jScope').value, p_from:$('#jFrom').value, p_to:$('#jTo').value };
@@ -1962,7 +1971,7 @@ function renderJobs(){
     kpi('Live items', sm.live||0, (sm.items||0)+' items in total'+(sm.extras?' · '+sm.extras+' extra':'')) +
     kpi('Hours logged', hm(Math.round((sm.hours_range||0)*60)), fmt(JOBS.from)+' – '+fmt(JOBS.to)+' · '+(sm.entries_range||0)+' entries') +
     kpi('All-time hours', hm(Math.round((sm.hours_total||0)*60)), 'on these items, incl. Clockify history') +
-    kpi('Showing', rows.length, liveOnly?'live items only':'everything');
+    kpi('Showing', rows.length, liveOnly?(JOBS.scope==='all'?'live items only (all-admin view)':'live items only'):'everything, incl. published and cancelled');
   $('#jobsSub').textContent = (JOBS.scope==='all' ? 'Live items across every sales admin.' : 'Every item under '+(VIEW_AS?VIEW_AS.name+'\u2019s':'your')+' IOs, straight from PACMAN.')+
     ' Hours are what editors logged (Cronus and imported Clockify). Shaded rows are extra work added under the IO (retainer posts, tech tasks, bonus items). Use the arrow at the end of a row for its entries.';
   if(!rows.length){ $('#jBody').innerHTML='<tr><td colspan="9" class="jempty">Nothing matches.</td></tr>'; return; }
