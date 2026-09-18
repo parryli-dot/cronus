@@ -2213,7 +2213,7 @@ function renderMonthly(rows){
   }
   const hasEcon=Object.keys(ECON).length>0;
   const ioCols=[{h:'IO',f:function(g){ return '<span class="iocopy" style="font-family:var(--mono)">'+esc(g.key)+'</span>'; }},
-    {h:'Brand · client',f:function(g){ return esc([g.brand,g.client].filter(Boolean).join(' · ')||'—'); }},
+    {h:'Brand · client',f:function(g){ return esc([g.brand,g.client].filter(Boolean).join(' · ')||'—')+(g.sa?'<div class="mini">'+esc(g.sa)+'</div>':''); }},
     {h:'Items',n:true,f:function(g){ return Object.keys(g.tasks).length; }}];
   if(hasEcon){
     ioCols.push({h:'Net revenue',n:true,f:function(g){ const x=ECON[g.key]; return x?money(x.revenue).replace('HKD ',''):'—'; }});
@@ -2270,9 +2270,9 @@ function renderMonthly(rows){
     rows.forEach(function(e){ const k=[secOf(e),e.io_eff||e.project,e.user_id].join('|');
       if(!m[k]) m[k]={sec:secOf(e),io:e.io_eff||'',proj:e.project||'',brand:e.brand||'',client:e.client||'',sa:e.sales_admin||'',user:e.user,mins:0,amount:0,kinds:{}};
       m[k].mins+=e.mins; m[k].amount+=(e.amount||0); m[k].kinds[e.kind]=1; });
-    const head=['Month','Section','IO','Project','Brand','Client','Person','Hours'].concat(a?['Cost HKD']:[]).concat(['IO net revenue','IO hours to date'].concat(a?['IO cost to date']:[])).concat(['Revenue share','Work types']);
+    const head=['Month','Section','IO','Project','Brand','Client','Sales admin','Person','Hours'].concat(a?['Cost HKD']:[]).concat(['IO net revenue','IO hours to date'].concat(a?['IO cost to date']:[])).concat(['Revenue share','Work types']);
     const lines=[head.join(',')].concat(Object.keys(m).sort().map(function(k){ const x=m[k]; const ec=ECON[x.io];
-      const r=[ym,x.sec,x.io,x.proj,x.brand,x.client,x.user,(x.mins/60).toFixed(2)]; if(a) r.push(x.amount.toFixed(2));
+      const r=[ym,x.sec,x.io,x.proj,x.brand,x.client,x.sa,x.user,(x.mins/60).toFixed(2)]; if(a) r.push(x.amount.toFixed(2));
       r.push(ec?ec.revenue.toFixed(2):''); r.push(ec?ec.hours_all.toFixed(2):''); if(a) r.push(ec?(ec.cost_all||0).toFixed(2):'');
       r.push(ec&&ec.hours_all>0?(ec.revenue*((x.mins/60)/ec.hours_all)).toFixed(2):''); r.push(Object.keys(x.kinds).join(' ')); return r.map(csvCell).join(','); }));
     const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
