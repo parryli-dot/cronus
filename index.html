@@ -738,7 +738,7 @@
         <div class="fld"><label>Scope</label><select id="jScope">
           <option value="mine">My IOs</option><option value="all">All sales admins (live items)</option></select></div>
         <div class="fld"><label>Show</label><select id="jLive">
-          <option value="live">Live items</option><option value="all">Everything</option></select></div>
+          <option value="live">Live items</option><option value="all">Everything</option><option value="published">Published only</option><option value="cancelled">Cancelled only</option></select></div>
         <div class="fld"><label>Hours from</label><input type="date" id="jFrom"></div>
         <div class="fld"><label>to</label><input type="date" id="jTo"></div>
         <div class="fld"><label>Search</label><input id="jQ" placeholder="IO, brand, item, editor…"></div>
@@ -747,8 +747,8 @@
       <div id="jItems">
       <div class="kpis" id="jKpis"></div>
       <div class="tblwrap"><table class="jobs" id="jTable">
-        <thead><tr><th>IO</th><th>IO created</th><th>Item</th><th>Status</th><th>Editor</th><th class="n">Hours (range)</th><th class="n">Total</th><th>Last logged</th><th></th></tr></thead>
-        <tbody id="jBody"><tr><td colspan="9" class="jempty">Loading…</td></tr></tbody>
+        <thead><tr><th>IO</th><th>IO created</th><th>Item</th><th>Status</th><th>Editor</th><th>Sales admin</th><th class="n">Hours (range)</th><th class="n">Total</th><th>Last logged</th><th></th></tr></thead>
+        <tbody id="jBody"><tr><td colspan="10" class="jempty">Loading…</td></tr></tbody>
       </table></div>
       </div>
       <div id="jCamp" style="display:none">
@@ -1946,11 +1946,11 @@ function syncShow(){
 async function loadJobs(){
   syncShow();
   if(!$('#jFrom').value){ const r=jobsDefaultRange(); $('#jFrom').value=r[0]; $('#jTo').value=r[1]; }
-  $('#jBody').innerHTML='<tr><td colspan="9" class="jempty">Loading…</td></tr>';
+  $('#jBody').innerHTML='<tr><td colspan="10" class="jempty">Loading…</td></tr>';
   const args={ p_scope:$('#jScope').value, p_from:$('#jFrom').value, p_to:$('#jTo').value };
   if(VIEW_AS) args.p_as=VIEW_AS.id;
   const r=await sb.rpc('jobs_overview',args);
-  if(r.error){ $('#jBody').innerHTML='<tr><td colspan="9" class="jempty">'+esc(friendly(r.error))+'</td></tr>'; return; }
+  if(r.error){ $('#jBody').innerHTML='<tr><td colspan="10" class="jempty">'+esc(friendly(r.error))+'</td></tr>'; return; }
   JOBS=r.data; jobsOpen=null; renderJobs();
 }
 function jobStatusPill(st){
@@ -1960,9 +1960,11 @@ function jobStatusPill(st){
 }
 function renderJobs(){
   if(!JOBS) return;
-  const q=$('#jQ').value.trim().toLowerCase(), liveOnly=$('#jLive').value==='live';
+  const q=$('#jQ').value.trim().toLowerCase(), show=$('#jLive').value, liveOnly=show==='live';
   const rows=(JOBS.rows||[]).filter(function(j){
     if(liveOnly && !j.live) return false;
+    if(show==='published' && j.status!=='Published') return false;
+    if(show==='cancelled' && j.status!=='Cancelled') return false;
     if(!q) return true;
     return [j.io,j.brand,j.client,j.deliverable,j.editors,j.sales_admin].join(' ').toLowerCase().indexOf(q)>=0;
   });
@@ -1971,24 +1973,25 @@ function renderJobs(){
     kpi('Live items', sm.live||0, (sm.items||0)+' items in total'+(sm.extras?' · '+sm.extras+' extra':'')) +
     kpi('Hours logged', hm(Math.round((sm.hours_range||0)*60)), fmt(JOBS.from)+' – '+fmt(JOBS.to)+' · '+(sm.entries_range||0)+' entries') +
     kpi('All-time hours', hm(Math.round((sm.hours_total||0)*60)), 'on these items, incl. Clockify history') +
-    kpi('Showing', rows.length, liveOnly?(JOBS.scope==='all'?'live items only (all-admin view)':'live items only'):'everything, incl. published and cancelled');
+    kpi('Showing', rows.length, liveOnly?(JOBS.scope==='all'?'live items only (all-admin view)':'live items only'):show==='published'?'published items only':show==='cancelled'?'cancelled items only':'everything, incl. published and cancelled');
   $('#jobsSub').textContent = (JOBS.scope==='all' ? 'Live items across every sales admin.' : 'Every item under '+(VIEW_AS?VIEW_AS.name+'\u2019s':'your')+' IOs, straight from PACMAN.')+
     ' Hours are what editors logged (Cronus and imported Clockify). Shaded rows are extra work added under the IO (retainer posts, tech tasks, bonus items). Use the arrow at the end of a row for its entries.';
-  if(!rows.length){ $('#jBody').innerHTML='<tr><td colspan="9" class="jempty">Nothing matches.</td></tr>'; return; }
+  if(!rows.length){ $('#jBody').innerHTML='<tr><td colspan="10" class="jempty">Nothing matches.</td></tr>'; return; }
   $('#jBody').innerHTML = rows.map(function(j){
     const open = jobsOpen===j.task_id;
     return '<tr class="j'+(j.extra?' x':'')+'" data-j="'+j.task_id+'">'+
       '<td class="io"><span class="iocopy">'+esc(j.io||'—')+'</span></td>'+
       '<td class="io created">'+(j.io_created?esc(j.io_created):'—')+'</td>'+
       '<td><div class="item">'+esc(j.deliverable)+'</div><div class="sub2">'+esc([j.brand,j.client].filter(Boolean).join(' · '))+
-        (j.tentative?' · due '+esc(j.tentative):'')+(JOBS.scope==='all'?' · '+esc(j.sales_admin||''):'')+'</div></td>'+
+        (j.tentative?' · due '+esc(j.tentative):'')+'</div></td>'+
       '<td>'+(j.extra?'<span class="pillj">'+esc(KIND_LAB[j.kind]||'Extra')+'</span>':jobStatusPill(j.status))+'</td>'+
       '<td class="ed">'+(j.editors?esc(j.editors):(j.extra?'<span style="color:var(--axis)">no time yet</span>':'<span style="color:var(--axis)">unassigned</span>'))+'</td>'+
+      '<td class="ed">'+(j.sales_admin?esc(j.sales_admin):'<span style="color:var(--axis)">—</span>')+'</td>'+
       '<td class="h'+(j.hours_range?'':' zero')+'">'+hm(Math.round(j.hours_range*60))+'</td>'+
       '<td class="h'+(j.hours_total?'':' zero')+'">'+hm(Math.round(j.hours_total*60))+'</td>'+
       '<td class="last">'+(j.last?fmt(j.last):'—')+'</td>'+
       '<td class="tg"><button class="jtg'+(open?' on':'')+'" data-tg="'+j.task_id+'" title="'+(open?'Hide entries':'Show entries')+'">'+(open?'&#9662;':'&#9656;')+'</button></td></tr>'+
-      (open?'<tr class="jx"><td colspan="9" class="jx" id="jxCell">Loading entries…</td></tr>':'');
+      (open?'<tr class="jx"><td colspan="10" class="jx" id="jxCell">Loading entries…</td></tr>':'');
   }).join('');
   $$('#jBody .jtg').forEach(function(b){ b.onclick=function(ev){ ev.stopPropagation();
     jobsOpen = jobsOpen===b.dataset.tg ? null : b.dataset.tg; renderJobs(); if(jobsOpen) loadJobEntries(jobsOpen); }; });
