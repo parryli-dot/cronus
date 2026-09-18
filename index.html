@@ -2212,8 +2212,8 @@ function renderMonthly(rows){
       '<td>'+Object.keys(list.reduce(function(m,e){ m[e.user_id]=1; return m; },{})).length+' people</td><td class="n"><b>'+hm(tot(list))+'</b></td>'+(a?'<td class="n"><b>'+money(amt(list)).replace('HKD ','')+'</b></td>':'')+'<td></td></tr></tfoot></table></div>';
   }
   const hasEcon=Object.keys(ECON).length>0;
-  const ioCols=[{h:'IO',f:function(g){ return '<span class="iocopy" style="font-family:var(--mono)">'+esc(g.key)+'</span>'; }},
-    {h:'Brand · client',f:function(g){ return esc([g.brand,g.client].filter(Boolean).join(' · ')||'—')+(g.sa?'<div class="mini">'+esc(g.sa)+'</div>':''); }},
+  const ioCols=[{h:'IO',f:function(g){ return '<span class="iocopy" style="font-family:var(--mono)">'+esc(g.key)+'</span>'+(g.sa?'<div class="mini">'+esc(g.sa)+'</div>':''); }},
+    {h:'Brand · client',f:function(g){ return esc([g.brand,g.client].filter(Boolean).join(' · ')||'—'); }},
     {h:'Items',n:true,f:function(g){ return Object.keys(g.tasks).length; }}];
   if(hasEcon){
     ioCols.push({h:'Net revenue',n:true,f:function(g){ const x=ECON[g.key]; return x?money(x.revenue).replace('HKD ',''):'—'; }});
