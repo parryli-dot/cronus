@@ -739,10 +739,10 @@
           <option value="mine">My IOs</option><option value="all">All sales admins (live items)</option></select></div>
         <div class="fld"><label>Show</label><select id="jLive">
           <option value="live">Live items</option><option value="all">Everything</option><option value="published">Published only</option><option value="cancelled">Cancelled only</option></select></div>
-        <div class="fld"><label>Hours logged from</label><input type="date" id="jFrom"></div>
+        <div class="fld"><label>Dates filter</label><select id="jDateKind">
+          <option value="hours">Hours logged</option><option value="created">IO created</option></select></div>
+        <div class="fld"><label>From</label><input type="date" id="jFrom"></div>
         <div class="fld"><label>to</label><input type="date" id="jTo"></div>
-        <div class="fld"><label>IO created from</label><input type="date" id="jCFrom"></div>
-        <div class="fld"><label>to</label><input type="date" id="jCTo"></div>
         <div class="fld"><label>Search</label><input id="jQ" placeholder="IO, brand, item, editor…"></div>
         <div class="fld"><label>&nbsp;</label><button class="add" id="jRun">Refresh</button></div>
       </div>
@@ -1949,7 +1949,9 @@ async function loadJobs(){
   syncShow();
   if(!$('#jFrom').value){ const r=jobsDefaultRange(); $('#jFrom').value=r[0]; $('#jTo').value=r[1]; }
   $('#jBody').innerHTML='<tr><td colspan="10" class="jempty">Loading…</td></tr>';
-  const args={ p_scope:$('#jScope').value, p_from:$('#jFrom').value, p_to:$('#jTo').value };
+  // Dates filter: "Hours logged" scopes the hours columns to the range; "IO created" lists IOs opened in the range and counts their hours from that start to today
+  const byCreated=$('#jDateKind').value==='created';
+  const args={ p_scope:$('#jScope').value, p_from:$('#jFrom').value, p_to:byCreated?S.today:$('#jTo').value };
   if(VIEW_AS) args.p_as=VIEW_AS.id;
   const r=await sb.rpc('jobs_overview',args);
   if(r.error){ $('#jBody').innerHTML='<tr><td colspan="10" class="jempty">'+esc(friendly(r.error))+'</td></tr>'; return; }
@@ -1962,7 +1964,8 @@ function jobStatusPill(st){
 }
 function renderJobs(){
   if(!JOBS) return;
-  const q=$('#jQ').value.trim().toLowerCase(), show=$('#jLive').value, liveOnly=show==='live', cf=$('#jCFrom').value, ct=$('#jCTo').value;
+  const q=$('#jQ').value.trim().toLowerCase(), show=$('#jLive').value, liveOnly=show==='live';
+  const byCreated=$('#jDateKind').value==='created', cf=byCreated?$('#jFrom').value:'', ct=byCreated?$('#jTo').value:'';
   const rows=(JOBS.rows||[]).filter(function(j){
     if(liveOnly && !j.live) return false;
     if(show==='published' && j.status!=='Published') return false;
@@ -1975,7 +1978,7 @@ function renderJobs(){
   const sm=JOBS.summary||{};
   $('#jKpis').innerHTML =
     kpi('Live items', sm.live||0, (sm.items||0)+' items in total'+(sm.extras?' · '+sm.extras+' extra':'')) +
-    kpi('Hours logged', hm(Math.round((sm.hours_range||0)*60)), fmt(JOBS.from)+' – '+fmt(JOBS.to)+' · '+(sm.entries_range||0)+' entries') +
+    kpi('Hours logged', hm(Math.round((sm.hours_range||0)*60)), (byCreated?'IOs created '+fmt(cf||JOBS.from)+' – '+fmt(ct||JOBS.to)+' · hours since '+fmt(JOBS.from):fmt(JOBS.from)+' – '+fmt(JOBS.to))+' · '+(sm.entries_range||0)+' entries') +
     kpi('All-time hours', hm(Math.round((sm.hours_total||0)*60)), 'on these items, incl. Clockify history') +
     kpi('Showing', rows.length, liveOnly?(JOBS.scope==='all'?'live items only (all-admin view)':'live items only'):show==='published'?'published items only':show==='cancelled'?'cancelled items only':'everything, incl. published and cancelled');
   $('#jobsSub').textContent = (JOBS.scope==='all' ? 'Live items across every sales admin.' : 'Every item under '+(VIEW_AS?VIEW_AS.name+'\u2019s':'your')+' IOs, straight from PACMAN.')+
@@ -2059,7 +2062,7 @@ function renderCamps(){
 }
 $('#campRun').onclick=loadCamps; $('#campArch').onchange=loadCamps;
 $('#jLive').onchange=renderJobs;
-$('#jQ').oninput=renderJobs; $('#jCFrom').onchange=renderJobs; $('#jCTo').onchange=renderJobs;
+$('#jQ').oninput=renderJobs; $('#jDateKind').onchange=loadJobs;
 
 /* ================= FAVOURITES ================= */
 let FAVS={};
