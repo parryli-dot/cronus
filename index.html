@@ -756,6 +756,7 @@
       <div id="jCamp" style="display:none">
         <p class="note" id="campNote">Pitching campaigns and internal events are work without an IO. Link a campaign to its IO once the deal closes — its hours then count under that IO in the monthly report. Events can list the IOs they cover.</p>
         <div class="filters"><div class="fld"><label>Show</label><select id="campArch"><option value="0">Active</option><option value="1">Including archived</option></select></div>
+          <div class="fld"><label>Search</label><input id="campQ" placeholder="name, brand, IO, code, who started it…"></div>
           <div class="fld"><label>&nbsp;</label><button class="add" id="campRun">Refresh</button></div></div>
         <div class="tblwrap"><table class="jobs camp" id="campTable">
           <thead><tr><th>Kind</th><th>Campaign / event</th><th>Brand</th><th>IO</th><th class="n">Tasks</th><th class="n">This month</th><th class="n">Total</th><th class="n">People</th><th>Last logged</th><th></th></tr></thead>
@@ -2031,8 +2032,10 @@ async function loadCamps(){
   CAMPS=r.data||[]; renderCamps();
 }
 function renderCamps(){
-  const rows=CAMPS||[];
-  if(!rows.length){ $('#campBody').innerHTML='<tr><td colspan="10" class="jempty">No pitching campaigns or events yet. Anyone can start one from Log time → “Add something that isn’t in PACMAN”.</td></tr>'; return; }
+  const q=$('#campQ').value.trim().toLowerCase();
+  const rows=(CAMPS||[]).filter(function(c){ if(!q) return true;
+    return [c.name,c.brand,c.code,c.created_by,c.linked_io].concat(c.ios||[]).join(' ').toLowerCase().indexOf(q)>=0; });
+  if(!rows.length){ $('#campBody').innerHTML='<tr><td colspan="10" class="jempty">'+(q?'Nothing matches “'+esc(q)+'”'+($('#campArch').value==='1'?'.':' — archived ones are hidden; switch Show to Including archived.'):'No pitching campaigns or events yet. Anyone can start one from Log time → “Add something that isn’t in PACMAN”.')+'</td></tr>'; return; }
   $('#campBody').innerHTML=rows.map(function(c){
     const ev=c.kind==='event';
     const ioCell = ev
@@ -2057,10 +2060,10 @@ function renderCamps(){
   $$('#campBody [data-unlink]').forEach(function(b){ b.onclick=function(){ act('link_campaign',{p_project:b.dataset.unlink,p_io:null},'Unlinked'); }; });
   $$('#campBody [data-addbtn]').forEach(function(b){ b.onclick=function(){ const v=$('#campBody input[data-addio="'+b.dataset.addbtn+'"]').value.trim(); if(!v) return toast('Type the IO number'); act('event_io_set',{p_project:b.dataset.addbtn,p_io:v,p_on:true},'IO added to the event'); }; });
   $$('#campBody [data-rmio]').forEach(function(a){ a.onclick=function(e){ e.preventDefault(); act('event_io_set',{p_project:a.dataset.p,p_io:a.dataset.rmio,p_on:false},'IO removed'); }; });
-  $$('#campBody [data-arch]').forEach(function(b){ b.onclick=function(){ act('campaign_archive',{p_project:b.dataset.arch,p_archived:b.dataset.to==='1'},b.dataset.to==='1'?'Archived':'Restored'); }; });
+  $$('#campBody [data-arch]').forEach(function(b){ b.onclick=function(){ act('campaign_archive',{p_project:b.dataset.arch,p_archived:b.dataset.to==='1'},b.dataset.to==='1'?'Archived \u2014 find it again under Show \u2192 Including archived':'Restored'); }; });
   $$('#campBody input').forEach(function(i){ i.onkeydown=function(e){ if(e.key==='Enter'){ const btn=i.parentElement.querySelector('button'); if(btn) btn.click(); } }; });
 }
-$('#campRun').onclick=loadCamps; $('#campArch').onchange=loadCamps;
+$('#campRun').onclick=loadCamps; $('#campArch').onchange=loadCamps; $('#campQ').oninput=renderCamps;
 $('#jLive').onchange=renderJobs;
 $('#jQ').oninput=renderJobs; $('#jDateKind').onchange=loadJobs;
 
