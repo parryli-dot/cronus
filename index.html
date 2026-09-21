@@ -531,7 +531,7 @@
         <div class="erow top">
           <div class="stepper">
             <button id="dPrev" title="Previous day">&lsaquo;</button>
-            <span class="lab today" id="dLab" title="Click to pick a date">&mdash;<input type="date" id="dPick"></span>
+            <span class="lab today" id="dLab" title="Click to pick a date"><span id="dLabTxt">&mdash;</span><input type="date" id="dPick"></span>
             <button id="dNext" title="Next day">&rsaquo;</button>
           </div>
           <button class="quick" data-jump="0">Today</button>
@@ -1065,9 +1065,9 @@ function currentTimes(){
 }
 function paintBar(){
   const lab=$('#dLab');
-  lab.textContent=(selDate===S.today?'Today · ':selDate===shift(S.today,-1)?'Yesterday · ':'')+fmt(selDate);
+  $('#dLabTxt').textContent=(selDate===S.today?'Today · ':selDate===shift(S.today,-1)?'Yesterday · ':'')+fmt(selDate);
   lab.classList.toggle('today',selDate===S.today);
-  const pick=$('#dPick'); if(pick){ pick.value=selDate; pick.max=S.today; lab.appendChild(pick); }
+  const pick=$('#dPick'); if(pick){ pick.value=selDate; pick.max=S.today; }
   $$('.quick[data-jump]').forEach(function(b){
     const t=b.dataset.jump==='fri'?lastFriday():shift(S.today,+b.dataset.jump);
     b.classList.toggle('on',t===selDate); });
