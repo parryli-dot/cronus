@@ -969,8 +969,8 @@ function pvPeople(){ return [{user_id:S.me.id,name:S.me.name}].concat((S.team||[
 // Your own permissions never change client-side, so a preview that could still write would be a lie.
 function layoutPreview(){ return !!(REAL_ME && REAL_ME.is_admin && ROLE_VIEW && ROLE_VIEW !== 'admin'); }
 function guardRO(){
-  if(VIEW_AS){ toast('Preview is read only — exit the preview to make changes'); return true; }
-  if(layoutPreview()){ toast('Layout preview is read only — switch back to your own layout to make changes'); return true; }
+  if(VIEW_AS){ toast('Preview is read only — exit the preview to make changes',true); return true; }
+  if(layoutPreview()){ toast('Layout preview is read only — switch back to your own layout to make changes',true); return true; }
   return false; }
 function setupPreviewTools(){
   const ok = !!(REAL_ME && REAL_ME.is_admin);
@@ -999,7 +999,7 @@ function previewRole(role){
 }
 async function setViewAs(uid){
   if(!uid){ exitPreview(); return; }
-  if(timer) { $('#viewAs').value=''; return toast('Stop your timer before previewing someone else'); }
+  if(timer) { $('#viewAs').value=''; return toast('Stop your timer before previewing someone else',true); }
   const r=await sb.rpc('bootstrap_as',{p_user:uid,p_days:60});
   if(r.error||!r.data||r.data.error){ $('#viewAs').value=''; return toast(friendly(r.error||{message:String(r.data&&r.data.error)}),true); }
   const d=r.data; VIEW_AS={id:uid,name:d.me.name};
@@ -1264,8 +1264,8 @@ $('#ncKind').onchange=ncSync; ['#ncCamp','#ncBrand','#ncSales','#ncPM'].forEach(
 $('#ncMake').onclick=async function(){
   if(guardRO()) return;
   const k=$('#ncKind').value, n=ncName();
-  if(k==='event' && !/^EVT?-?\d{6,9}$/.test(n.code)) return toast('Event code looks like EVT-20260702');
-  if(!n.name) return toast(k==='event'?'Give the event a name':'Give the campaign a name');
+  if(k==='event' && !/^EVT?-?\d{6,9}$/.test(n.code)) return toast('Event code looks like EVT-20260702',true);
+  if(!n.name) return toast(k==='event'?'Give the event a name':'Give the campaign a name',true);
   const r=await sb.rpc('create_campaign',{p_kind:k,p_name:n.name,p_brand:n.brand||null,p_code:n.code||null});
   if(r.error) return toast(friendly(r.error),true);
   const d=r.data, sel=$('#mTarget');
@@ -1298,8 +1298,8 @@ $('#mMake').onclick=async function(){
   const pid=$('#mTarget').value, k=targetKind(), booking=k==='booking';
   const kind = booking ? $('#mKind').value : null;
   const nm = (booking && kind==='tech') ? $('#mTech').value : $('#mName').value.trim();
-  if(!pid) return toast('Nothing to attach it to');
-  if(!nm) return toast('Give it a name');
+  if(!pid) return toast('Nothing to attach it to',true);
+  if(!nm) return toast('Give it a name',true);
   const r=await sb.rpc('create_manual_item',{p_project:pid,p_name:nm,p_kind:kind});
   if(r.error) return toast(friendly(r.error),true);
   const d=r.data, opt=$('#mTarget').selectedOptions[0];
@@ -1378,12 +1378,12 @@ async function removeEntry(e){
 function tryAdd(){
   if(guardRO()) return;
   const tt=currentTimes();
-  if(!selTask) return toast('Pick a deliverable first');
-  if(tt.a===null) { $('#tStart').focus(); return toast('Start time not understood — try 9:30 or 930'); }
-  if(tt.b===null) { $('#tEnd').focus(); return toast('Finish not understood — a time like 11:00, or a length like 1.5'); }
+  if(!selTask) return toast('Pick a deliverable first',true);
+  if(tt.a===null) { $('#tStart').focus(); return toast('Start time not understood — try 9:30 or 930',true); }
+  if(tt.b===null) { $('#tEnd').focus(); return toast('Finish not understood — a time like 11:00, or a length like 1.5',true); }
   const mins=spanMins(tt.a,tt.b);   // finish earlier than start = finished the next day
-  if(mins<=0) return toast('Start and finish are the same time');
-  if(stageRequired()&&!effStage()) return toast('This is booked work — it needs a stage');
+  if(mins<=0) return toast('Start and finish are the same time',true);
+  if(stageRequired()&&!effStage()) return toast('This is booked work — it needs a stage',true);
   const dup=ENTRIES.filter(function(e){ return e.task_id===selTask && e.date===selDate && e.start===t2s(tt.a) && e.end===t2s(tt.b); })[0];
   if(dup){ toast('Already logged: '+dup.start+'–'+dup.end+' on this deliverable '+(selDate===S.today?'today':fmt(selDate))+'. Change the time, or use ✎ on the existing one.',true); return; }
   const row={ id:tempId(), task_id:selTask, project_id:TASK[selTask].project_id, date:selDate,
@@ -1533,18 +1533,18 @@ function wireSheet(){
   $('#sSave').onclick=async function(){
     const a=parseTime($('#sA').value), b=parseTime($('#sB').value);
     const t=TASK[e.task_id]||{};
-    if(t.booked&&!$('#sS').value) return toast('Booked work needs a stage');
+    if(t.booked&&!$('#sS').value) return toast('Booked work needs a stage',true);
     const day=$('#sDate').value;
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(day)) return toast('Pick a day');
-    if(day>S.today) return toast('Time cannot be logged into the future');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(day)) return toast('Pick a day',true);
+    if(day>S.today) return toast('Time cannot be logged into the future',true);
     let patch={ date:day, stage:$('#sS').value||null, note:$('#sN').value.trim() };
     const bothBlank = !$('#sA').value.trim() && !$('#sB').value.trim();
     if(bothBlank){ patch.start=null; patch.end=null; }
     else {
-      if(a===null) return toast('Start time not understood');
-      if(b===null) return toast('Finish time not understood');
+      if(a===null) return toast('Start time not understood',true);
+      if(b===null) return toast('Finish time not understood',true);
       const mins=spanMins(a,b);   // finish earlier than start = finished the next day
-      if(mins<=0) return toast('Start and finish are the same time');
+      if(mins<=0) return toast('Start and finish are the same time',true);
       patch.start=t2s(a); patch.end=t2s(b); patch.mins=mins;
     }
     const moved = day!==e.date;
@@ -1684,8 +1684,8 @@ function wireCalDrag(){
     col.onpointerdown=function(ev){
       const blk=ev.target.closest('.blk');
       if(blk){ startBlockDrag(ev,blk,col,ev.target.classList.contains('rz')); return; }
-      if(col.dataset.date > S.today){ toast('No logging into the future'); return; }
-      if(!selTask){ toast('Pick a deliverable on the Log screen first'); return; }
+      if(col.dataset.date > S.today){ toast('No logging into the future',true); return; }
+      if(!selTask){ toast('Pick a deliverable on the Log screen first',true); return; }
       ev.preventDefault(); col.setPointerCapture(ev.pointerId);
       const a=yToMin(col,ev.clientY);
       const g=document.createElement('div'); g.className='ghost'; col.appendChild(g);
@@ -1713,7 +1713,7 @@ function wireCalDrag(){
       const a=Math.min(d.a,d.b), b=Math.max(d.a,d.b);
       if(b-a < SNAP) { renderCal(); return; }
       const date=d.col.dataset.date;
-      if(stageRequired()&&!effStage()){ toast('This is booked work — it needs a stage'); renderCal(); return; }
+      if(stageRequired()&&!effStage()){ toast('This is booked work — it needs a stage',true); renderCal(); return; }
       const row={ id:tempId(),task_id:selTask,project_id:TASK[selTask].project_id,date:date,
                   mins:b-a,start:t2s(a),end:t2s(b),stage:effStage(),note:'',source:'manual',locked:false,_p:true };
       ENTRIES.push(row); renderAll();
@@ -1739,7 +1739,7 @@ function startBlockDrag(ev,blk,col,resize){
   const e=ENTRIES.filter(function(x){return String(x.id)===blk.dataset.id;})[0];
   if(!e||e.locked) return;
   const a=parseTime(e.start), b=parseTime(e.end);
-  if(crossesDay(a,b)){ toast('This entry runs past midnight — adjust it from the Log screen'); return; }
+  if(crossesDay(a,b)){ toast('This entry runs past midnight — adjust it from the Log screen',true); return; }
   ev.preventDefault(); ev.stopPropagation(); col.setPointerCapture(ev.pointerId);
   blk.classList.add('drag');
   drag={ mode:resize?'resize':'move', col:col, e:e, blk:blk, a:a, b:b, a0:a, len:b-a,
@@ -1753,7 +1753,7 @@ function paintBlock(){
   if(sp) sp.textContent=t2s(a)+'–'+t2s(b)+' · '+hm(b-a);
 }
 $('#cPrev').onclick=function(){ if(isNarrow()){ selDate=shift(selDate,-1); } else calMon=shift(calMon,-7); renderAll(); };
-$('#cNext').onclick=function(){ if(isNarrow()){ if(selDate<S.today) selDate=shift(selDate,1); else return toast('No logging into the future'); } else calMon=shift(calMon,7); renderAll(); };
+$('#cNext').onclick=function(){ if(isNarrow()){ if(selDate<S.today) selDate=shift(selDate,1); else return toast('No logging into the future',true); } else calMon=shift(calMon,7); renderAll(); };
 $('#cToday').onclick=function(){ selDate=S.today; calMon=monday(S.today); renderAll(); };
 
 /* ---------- week grid + chart ---------- */
@@ -1825,9 +1825,9 @@ function renderWeek(){
     inp.onfocus=function(){ inp.select(); };
     inp.onchange=async function(){
       const v=inp.value.trim(), m=v===''?0:parseDur(v);
-      if(m===null){ toast('Try 1.5, 90m or 1:30'); inp.value=''; return; }
+      if(m===null){ toast('Try 1.5, 90m or 1:30',true); inp.value=''; return; }
       const t=TASK[inp.dataset.task];
-      if(m&&t.booked&&!t.suggest){ toast('That deliverable needs a stage — set one on the Log screen first'); inp.value=''; return; }
+      if(m&&t.booked&&!t.suggest){ toast('That deliverable needs a stage — set one on the Log screen first',true); inp.value=''; return; }
       await setCell(inp.dataset.task,inp.dataset.date,m);
       $('#wkSaved').textContent='saved'; renderAll();
     };
@@ -1855,7 +1855,7 @@ $('#copyLast').onclick=async function(){
     const tasks=[]; ENTRIES.forEach(function(e){ if(e.date===prev[i]&&tasks.indexOf(e.task_id)<0) tasks.push(e.task_id); });
     for(const id of tasks){ if(cellMins(id,cur[i])) continue; await setCell(id,cur[i],cellMins(id,prev[i])); n++; }
   }
-  renderAll(); toast(n?('Copied '+n+' cells from last week'):'Nothing to copy \u2014 every cell last week filled is already filled this week (or falls after today)');
+  renderAll(); toast(n?('Copied '+n+' cells from last week'):'Nothing to copy \u2014 every cell last week filled is already filled this week (or falls after today)',!n);
 };
 
 /* ---------- wiring ---------- */
@@ -1867,18 +1867,18 @@ $('#dLab').onclick=function(){
 };
 $('#dPick').onchange=function(){
   const v=this.value; if(!v) return;
-  if(v>S.today){ this.value=selDate; return toast('No logging into the future'); }
+  if(v>S.today){ this.value=selDate; return toast('No logging into the future',true); }
   selDate=v; calMon=monday(v); resetTimes(); $('#saved').className='saved'; renderAll();
 };
 $('#dPrev').onclick=function(){ selDate=shift(selDate,-1); resetTimes(); $('#saved').className='saved'; renderAll(); };
-$('#dNext').onclick=function(){ if(selDate<S.today){ selDate=shift(selDate,1); resetTimes(); renderAll(); } else toast('No logging into the future'); };
+$('#dNext').onclick=function(){ if(selDate<S.today){ selDate=shift(selDate,1); resetTimes(); renderAll(); } else toast('No logging into the future',true); };
 $$('.quick[data-jump]').forEach(function(b){ b.onclick=function(){
   selDate=b.dataset.jump==='fri'?lastFriday():shift(S.today,+b.dataset.jump); resetTimes(); renderAll(); }; });
 $('#pickBtn').onclick=function(e){
   if(selTask&&e.target.classList.contains('x')){ selTask=null; selStage=null; renderRows(); paintBar(); return; }
   $('#dsearch').focus(); };
 $('#stageBtn').onclick=function(e){
-  if(!selTask) return toast('Pick a deliverable first');
+  if(!selTask) return toast('Pick a deliverable first',true);
   openStageMenu(e.currentTarget,effStage(),function(s){ selStage=s; paintBar(); }); };
 $('#tStart').oninput=paintBar; $('#tEnd').oninput=paintBar;
 $('#tStart').onkeydown=function(e){ if(e.key==='Enter'){ $('#tEnd').focus(); } };
@@ -1951,11 +1951,11 @@ $('#timerBtn').onclick=async function(){
     const a=tStartMin; let b=nowMinHK(); if(b===a) b=a+1;   // b earlier than a = the timer ran past midnight; handled as a cross-day entry
     tSecs=0; tStartMin=null; saveTimer(); paintTimer();
     $('#tStart').value=t2s(a); $('#tEnd').value=t2s(b);
-    if(selTask){ tryAdd(); } else toast('Timer stopped — pick a deliverable and press Add');
+    if(selTask){ tryAdd(); } else toast('Timer stopped — pick a deliverable and press Add',true);
     return;
   }
-  if(!selTask) return toast('Pick a deliverable first');
-  if(stageRequired()&&!effStage()) return toast('This is booked work — it needs a stage');
+  if(!selTask) return toast('Pick a deliverable first',true);
+  if(stageRequired()&&!effStage()) return toast('This is booked work — it needs a stage',true);
   selDate=S.today; tStartMin=nowMinHK(); tSecs=0;
   timer=setInterval(tick,1000); saveTimer(); paintTimer();
   toast('Timer running — it fills in the finish time as it goes');
@@ -2083,9 +2083,9 @@ function renderCamps(){
       '<td class="tg">'+(VIEW_AS?'':'<button class="tbtn sm" data-arch="'+c.project_id+'" data-to="'+(c.archived?'0':'1')+'">'+(c.archived?'Restore':'Archive')+'</button>')+'</td></tr>';
   }).join('');
   async function act(fn,args,ok){ if(guardRO()) return; const r=await sb.rpc(fn,args); if(r.error) return toast(friendly(r.error),true); toast(ok); loadCamps(); }
-  $$('#campBody [data-linkbtn]').forEach(function(b){ b.onclick=function(){ const v=$('#campBody input[data-linkio="'+b.dataset.linkbtn+'"]').value.trim(); if(!v) return toast('Type the IO number'); act('link_campaign',{p_project:b.dataset.linkbtn,p_io:v},'Linked — its hours now count under '+v.toUpperCase()); }; });
+  $$('#campBody [data-linkbtn]').forEach(function(b){ b.onclick=function(){ const v=$('#campBody input[data-linkio="'+b.dataset.linkbtn+'"]').value.trim(); if(!v) return toast('Type the IO number',true); act('link_campaign',{p_project:b.dataset.linkbtn,p_io:v},'Linked — its hours now count under '+v.toUpperCase()); }; });
   $$('#campBody [data-unlink]').forEach(function(b){ b.onclick=function(){ act('link_campaign',{p_project:b.dataset.unlink,p_io:null},'Unlinked'); }; });
-  $$('#campBody [data-addbtn]').forEach(function(b){ b.onclick=function(){ const v=$('#campBody input[data-addio="'+b.dataset.addbtn+'"]').value.trim(); if(!v) return toast('Type the IO number'); act('event_io_set',{p_project:b.dataset.addbtn,p_io:v,p_on:true},'IO added to the event'); }; });
+  $$('#campBody [data-addbtn]').forEach(function(b){ b.onclick=function(){ const v=$('#campBody input[data-addio="'+b.dataset.addbtn+'"]').value.trim(); if(!v) return toast('Type the IO number',true); act('event_io_set',{p_project:b.dataset.addbtn,p_io:v,p_on:true},'IO added to the event'); }; });
   $$('#campBody [data-rmio]').forEach(function(a){ a.onclick=function(e){ e.preventDefault(); act('event_io_set',{p_project:a.dataset.p,p_io:a.dataset.rmio,p_on:false},'IO removed'); }; });
   $$('#campBody [data-arch]').forEach(function(b){ b.onclick=function(){ act('campaign_archive',{p_project:b.dataset.arch,p_archived:b.dataset.to==='1'},b.dataset.to==='1'?'Archived \u2014 find it again under Show \u2192 Including archived':'Restored'); }; });
   $$('#campBody input').forEach(function(i){ i.onkeydown=function(e){ if(e.key==='Enter'){ const btn=i.parentElement.querySelector('button'); if(btn) btn.click(); } }; });
@@ -2140,7 +2140,7 @@ function fillRepFilters(){
 }
 async function runReport(){
   const from=$('#rFrom').value, to=$('#rTo').value;
-  if(!from||!to) return toast('Pick a date range');
+  if(!from||!to) return toast('Pick a date range',true);
   $('#rBody').innerHTML='<div class="card2">Running…</div>';
   const rr=$('#rRound').value.split('|');
   const args={ p_from:from, p_to:to, p_round:+rr[0], p_mode:rr[1] };
@@ -2401,7 +2401,7 @@ function renderAudit(rows){
 }
 function csvCell(v){ const s=String(v==null?'':v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
 $('#rCsv').onclick=function(){
-  if(!REP||!REP.rows.length) return toast('Run a report first');
+  if(!REP||!REP.rows.length) return toast('Run a report first',true);
   const a=REP.can_see_amounts;
   const head=['Date','Member','Deliverable','Booking','Client','Entity','Page','Stage','Note','Start','Finish','Hours','Booked','Source'].concat(a?['Amount HKD']:[]);
   const lines=[head.join(',')].concat(REP.rows.map(function(e){
@@ -2815,7 +2815,7 @@ function wireDetailedEdit(){
     const patch={ entry_date:$('#eD').value, stage_tag_id:$('#eS').value||null,
                   description:$('#eN').value.trim()||null, edited_by:S.me.id };
     if(both){
-      if(a===null||b2===null) return toast('Times not understood');
+      if(a===null||b2===null) return toast('Times not understood',true);
       let mins=b2-a; if(mins<=0) mins+=1440;
       patch.duration_sec=mins*60;
       patch.started_at=$('#eD').value+'T'+t2s(a)+':00+08:00';
