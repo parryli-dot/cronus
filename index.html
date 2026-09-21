@@ -779,6 +779,7 @@
         <button class="atab" data-a="rules">Reminders</button>
         <button class="atab" data-a="groups">Groups</button>
         <button class="atab" data-a="lock">Month lock</button>
+        <button class="atab" data-a="act">Activity</button>
       </div>
       <div id="admBody"></div>
     </section>
@@ -1005,6 +1006,8 @@ async function setViewAs(uid){
   const r=await sb.rpc('bootstrap_as',{p_user:uid,p_days:60});
   if(r.error||!r.data||r.data.error){ $('#viewAs').value=''; return toast(friendly(r.error||{message:String(r.data&&r.data.error)}),true); }
   const d=r.data; VIEW_AS={id:uid,name:d.me.name};
+  // 睇人哋嘅資料本身係一件要記低嘅事，觸發器捉唔到，所以喺呢度寫一行
+  sb.rpc('activity_note',{p_action:'preview_person',p_summary:'Looked at '+d.me.name+'\u2019s data with View as',p_object_kind:'user',p_object_id:uid});
   applyBoot(d); FAVS={};
   const role = roleFor(S);
   applyChrome(role, {log:S.me.tracks_time});
@@ -2309,6 +2312,7 @@ function renderMonthly(rows){
     const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
     const url=URL.createObjectURL(blob), el=document.createElement('a');
     el.href=url; el.download='cronus-monthly-'+ym+'.csv'; document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(url);
+    sb.rpc('activity_note',{p_action:'export_csv',p_summary:'Exported the monthly finance CSV for '+ym,p_object_kind:'monthly',p_object_id:ym});
     toast('Exported '+(lines.length-1)+' rows for '+ym);
   };
 }
@@ -2421,6 +2425,7 @@ $('#rCsv').onclick=function(){
   const tag=(REP.step?('r'+REP.step+REP.mode):'exact');
   el.href=url; el.download='cronus-'+$('#rFrom').value+'_'+$('#rTo').value+'-'+tag+'.csv';
   document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(url);
+  sb.rpc('activity_note',{p_action:'export_csv',p_summary:'Exported '+REP.rows.length+' report rows for '+$('#rFrom').value+' \u2192 '+$('#rTo').value,p_object_kind:'report'});
   toast('Exported '+REP.rows.length+' entries');
 };
 $('#rRun').onclick=runReport;
@@ -2487,7 +2492,8 @@ $('#dRange').onchange=runDash;
 
 
 /* ================= ADMIN ================= */
-let aTab='people', STAFF=null, TAGS=null, RULES=null, GROUPS=null, EFFORT=null, LOCKS=null;
+let aTab='people', STAFF=null, TAGS=null, RULES=null, GROUPS=null, EFFORT=null, LOCKS=null, ACTS=null;
+let actF={from:null,to:null,user:'',action:''};
 const ROLES=['member','project_manager','team_manager','admin'];
 const roleLabel2=r=>({member:'Member',project_manager:'Project manager',
   team_manager:'Team manager',admin:'Admin'}[r]||r);
@@ -2504,6 +2510,12 @@ async function admLoad(force){
     if(r.error) return toast(friendly(r.error),true); GROUPS=r.data; }
   if(aTab==='lock' && (!LOCKS||force)){ const r=await sb.rpc('admin_lock_overview',{p_months:8});
     if(r.error) return toast(friendly(r.error),true); LOCKS=r.data; }
+  if(aTab==='act'){
+    if(!actF.from){ actF.to=S.today; actF.from=shift(S.today,-7); }
+    if(!STAFF){ const st=await sb.rpc('admin_staff'); if(!st.error) STAFF=st.data; }
+    const r=await sb.rpc('admin_activity',{p_from:actF.from,p_to:actF.to,
+      p_user:actF.user||null, p_action:actF.action||null, p_limit:500});
+    if(r.error) return toast(friendly(r.error),true); ACTS=r.data; }
   if(aTab==='effort' && (!EFFORT||force)){
     const from=$('#rFrom')?$('#rFrom').value:shift(S.today,-90), to=$('#rTo')?$('#rTo').value:S.today;
     const r=await sb.rpc('margin_by_booking',{p_from:from,p_to:to,p_min_hours:0.5});
@@ -2518,6 +2530,56 @@ function admRender(){
   if(aTab==='groups')  return admGroups(b);
   if(aTab==='effort')  return admEffort(b);
   if(aTab==='lock')    return admLock(b);
+  if(aTab==='act')     return admAct(b);
+}
+// 行為日誌：淨係人喺 Cronus 做過嘅嘢。PACMAN 同步、Clockify 匯入、夜晚嘅排程冇登入身分，一律唔會入呢度。
+const ACT_KINDS=[['','Everything'],['time_entries','Time entries'],['tasks','Items added under a booking'],
+  ['projects','Campaigns & events'],['users','People settings'],['cost_rates','Cost rates'],
+  ['tags','Stages'],['reminder_rules','Reminders'],['lock_month','Month locked'],['unlock_month','Month unlocked'],
+  ['export_csv','CSV exports'],['preview_person','View as someone']];
+function actWhen(iso){ return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Hong_Kong',
+  day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(iso)); }
+function admAct(b){
+  if(!ACTS){ b.innerHTML='<div class="card2">Loading\u2026</div>'; return; }
+  const rows=ACTS||[];
+  const people=(STAFF||[]).slice().sort(function(x,y){ return x.name<y.name?-1:1; });
+  b.innerHTML=
+    '<div class="filters">'+
+      '<div class="fld"><label>From</label><input type="date" id="acFrom" value="'+actF.from+'"></div>'+
+      '<div class="fld"><label>To</label><input type="date" id="acTo" value="'+actF.to+'"></div>'+
+      '<div class="fld"><label>Who</label><select id="acUser"><option value="">Everyone</option>'+
+        people.map(function(u){ return '<option value="'+u.id+'"'+(actF.user===u.id?' selected':'')+'>'+esc(u.name)+'</option>'; }).join('')+
+      '</select></div>'+
+      '<div class="fld"><label>What</label><select id="acAct">'+
+        ACT_KINDS.map(function(k){ return '<option value="'+k[0]+'"'+(actF.action===k[0]?' selected':'')+'>'+k[1]+'</option>'; }).join('')+
+      '</select></div>'+
+      '<div class="fld"><label>&nbsp;</label><button class="add" id="acRun">Show</button></div>'+
+      '<div class="fld"><label>&nbsp;</label><button class="tbtn" id="acCsv">&#8681; CSV</button></div>'+
+    '</div>'+
+    '<div class="tblwrap"><table class="adm"><thead><tr><th>When</th><th>Who</th><th>What they did</th><th>Fields changed</th></tr></thead><tbody>'+
+    (rows.length?rows.map(function(a){
+      const ch=a.detail?Object.keys(a.detail).join(', '):'';
+      return '<tr><td style="white-space:nowrap">'+esc(actWhen(a.at))+'</td>'+
+             '<td>'+esc(a.who||'\u2014')+'</td>'+
+             '<td>'+esc(a.summary||a.action)+'<div class="mini">'+esc(a.action)+'</div></td>'+
+             '<td class="mini">'+esc(ch)+'</td></tr>';
+    }).join(''):'<tr><td colspan="4">Nothing in range.</td></tr>')+
+    '</tbody></table></div>'+
+    '<p class="note">'+rows.length+' entries, newest first'+(rows.length>=500?' (capped at 500 \u2014 narrow the range)':'')+
+    '. Only what people did in Cronus: the PACMAN sync, the Clockify import and the nightly jobs have no sign-in, so they are never logged. '+
+    'Locking a month is one line, not one per entry.</p>';
+  $('#acRun').onclick=function(){ actF.from=$('#acFrom').value; actF.to=$('#acTo').value;
+    actF.user=$('#acUser').value; actF.action=$('#acAct').value; ACTS=null; admRender(); admLoad(true); };
+  $('#acCsv').onclick=function(){
+    const lines=[['When (HK)','Who','Action','What they did','Object','Fields changed'].join(',')].concat(
+      rows.map(function(a){ return [actWhen(a.at),a.who||'',a.action,a.summary||'',
+        (a.kind||'')+' '+(a.object_id||''), a.detail?Object.keys(a.detail).join(' '):''].map(csvCell).join(','); }));
+    const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob), el=document.createElement('a');
+    el.href=url; el.download='cronus-activity-'+actF.from+'_'+actF.to+'.csv';
+    document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(url);
+    toast('Exported '+rows.length+' rows');
+  };
 }
 
 /* ---- month lock ---- */
