@@ -512,7 +512,7 @@
   <main>
     <!-- ============ PREVIEW TOOLS (admins only) ============ -->
     <div class="pvbar" id="pvbar" style="display:none">
-      <span class="plab">Preview</span>
+      <span class="plab">Layout</span>
       <div class="rolesw" id="roleSw">
         <button data-role="admin" class="on">Admin</button>
         <button data-role="editor">Editor</button>
@@ -965,7 +965,13 @@ let REAL_ME=null, VIEW_AS=null, ROLE_VIEW='admin', pvWired=false;
 // who the previewed person can see: themselves plus their manager_scope (Dashboard and Reports in preview use this, not just the person alone)
 function pvScope(){ if(S.me.is_admin||S.isSalesAdmin) return null; return [S.me.id].concat((S.team||[]).map(function(u){return u.id;})); }
 function pvPeople(){ return [{user_id:S.me.id,name:S.me.name}].concat((S.team||[]).map(function(u){return {user_id:u.id,name:u.name};})); }
-function guardRO(){ if(VIEW_AS){ toast('Preview is read only — exit the preview to make changes'); return true; } return false; }
+// Two different previews, both look-don't-touch: a layout that is not your own role, or someone else's data.
+// Your own permissions never change client-side, so a preview that could still write would be a lie.
+function layoutPreview(){ return !!(REAL_ME && REAL_ME.is_admin && ROLE_VIEW && ROLE_VIEW !== 'admin'); }
+function guardRO(){
+  if(VIEW_AS){ toast('Preview is read only — exit the preview to make changes'); return true; }
+  if(layoutPreview()){ toast('Layout preview is read only — switch back to your own layout to make changes'); return true; }
+  return false; }
 function setupPreviewTools(){
   const ok = !!(REAL_ME && REAL_ME.is_admin);
   $('#pvbar').style.display = ok ? '' : 'none';
@@ -986,9 +992,10 @@ function previewRole(role){
   if(VIEW_AS){ // role tabs describe the previewed person; switching role means leaving the person
     exitPreview().then(function(){ previewRole(role); }); return; }
   applyChrome(role);
-  if(role==='admin') pvCaption('');
-  else if(role==='editor') pvCaption('<b>Editor layout</b> — what someone who logs time sees. The items and hours are still yours; pick a person under <b>View as…</b> to see theirs.');
-  else pvCaption('<b>Sales admin layout</b> — no time logging, lands on Jobs. Jobs shows your own IOs; pick a sales admin under <b>View as…</b> to see theirs.');
+  if(!layoutPreview()) pvCaption('');
+  else if(role==='editor') pvCaption('&#128065; <b>Editor layout</b> &mdash; the menu and screens someone who logs time sees. Your own data and your own admin rights are unchanged, so this is <b>read only</b>; pick a person under <b>View as\u2026</b> to see their data.');
+  else if(role==='sales') pvCaption('&#128065; <b>Sales admin layout</b> &mdash; no time logging, lands on Jobs. Your own data and your own admin rights are unchanged, so this is <b>read only</b>; pick a sales admin under <b>View as\u2026</b> to see theirs.');
+  else pvCaption('&#128065; <b>Admin layout</b> &mdash; <b>read only</b> while it is not your own role.');
 }
 async function setViewAs(uid){
   if(!uid){ exitPreview(); return; }
