@@ -66,6 +66,9 @@
   .stepper .lab { padding:7px 10px; font-size:13.5px; font-weight:600; min-width:136px; text-align:center;
     border-left:1px solid var(--line); border-right:1px solid var(--line); font-variant-numeric:tabular-nums; }
   .stepper .lab.today { color:var(--booked); }
+  .stepper .lab { position:relative; cursor:pointer; }
+  .stepper .lab input[type=date] { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer;
+    border:0; padding:0; background:none; }
   .quick { border:1px solid var(--line); background:var(--raised); border-radius:8px; padding:7px 11px;
     font-size:13px; color:var(--ink-2); }
   .quick:hover { background:var(--wash); color:var(--ink); }
@@ -528,7 +531,7 @@
         <div class="erow top">
           <div class="stepper">
             <button id="dPrev" title="Previous day">&lsaquo;</button>
-            <span class="lab today" id="dLab">&mdash;</span>
+            <span class="lab today" id="dLab" title="Click to pick a date">&mdash;<input type="date" id="dPick"></span>
             <button id="dNext" title="Next day">&rsaquo;</button>
           </div>
           <button class="quick" data-jump="0">Today</button>
@@ -1064,6 +1067,7 @@ function paintBar(){
   const lab=$('#dLab');
   lab.textContent=(selDate===S.today?'Today · ':selDate===shift(S.today,-1)?'Yesterday · ':'')+fmt(selDate);
   lab.classList.toggle('today',selDate===S.today);
+  const pick=$('#dPick'); if(pick){ pick.value=selDate; pick.max=S.today; lab.appendChild(pick); }
   $$('.quick[data-jump]').forEach(function(b){
     const t=b.dataset.jump==='fri'?lastFriday():shift(S.today,+b.dataset.jump);
     b.classList.toggle('on',t===selDate); });
@@ -1848,6 +1852,12 @@ $('#copyLast').onclick=async function(){
 };
 
 /* ---------- wiring ---------- */
+// the arrows are fine for yesterday, hopeless for June: the label doubles as a date picker
+$('#dPick').onchange=function(){
+  const v=this.value; if(!v) return;
+  if(v>S.today){ this.value=selDate; return toast('No logging into the future'); }
+  selDate=v; calMon=monday(v); resetTimes(); $('#saved').className='saved'; renderAll();
+};
 $('#dPrev').onclick=function(){ selDate=shift(selDate,-1); resetTimes(); $('#saved').className='saved'; renderAll(); };
 $('#dNext').onclick=function(){ if(selDate<S.today){ selDate=shift(selDate,1); resetTimes(); renderAll(); } else toast('No logging into the future'); };
 $$('.quick[data-jump]').forEach(function(b){ b.onclick=function(){
