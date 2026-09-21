@@ -775,6 +775,7 @@
         <button class="atab" data-a="tags">Stages</button>
         <button class="atab" data-a="rules">Reminders</button>
         <button class="atab" data-a="groups">Groups</button>
+        <button class="atab" data-a="lock">Month lock</button>
       </div>
       <div id="admBody"></div>
     </section>
@@ -2458,7 +2459,7 @@ $('#dRange').onchange=runDash;
 
 
 /* ================= ADMIN ================= */
-let aTab='people', STAFF=null, TAGS=null, RULES=null, GROUPS=null, EFFORT=null;
+let aTab='people', STAFF=null, TAGS=null, RULES=null, GROUPS=null, EFFORT=null, LOCKS=null;
 const ROLES=['member','project_manager','team_manager','admin'];
 const roleLabel2=r=>({member:'Member',project_manager:'Project manager',
   team_manager:'Team manager',admin:'Admin'}[r]||r);
@@ -2473,6 +2474,8 @@ async function admLoad(force){
     if(!GROUPS){ const g=await sb.rpc('admin_groups'); if(!g.error) GROUPS=g.data; } }
   if(aTab==='groups' && (!GROUPS||force)){ const r=await sb.rpc('admin_groups');
     if(r.error) return toast(friendly(r.error),true); GROUPS=r.data; }
+  if(aTab==='lock' && (!LOCKS||force)){ const r=await sb.rpc('admin_lock_overview',{p_months:8});
+    if(r.error) return toast(friendly(r.error),true); LOCKS=r.data; }
   if(aTab==='effort' && (!EFFORT||force)){
     const from=$('#rFrom')?$('#rFrom').value:shift(S.today,-90), to=$('#rTo')?$('#rTo').value:S.today;
     const r=await sb.rpc('margin_by_booking',{p_from:from,p_to:to,p_min_hours:0.5});
@@ -2486,6 +2489,37 @@ function admRender(){
   if(aTab==='rules')   return admRules(b);
   if(aTab==='groups')  return admGroups(b);
   if(aTab==='effort')  return admEffort(b);
+  if(aTab==='lock')    return admLock(b);
+}
+
+/* ---- month lock ---- */
+// locking is manual: an admin closes a month once Finance has reconciled it, and can reopen it
+function admLock(b){
+  if(!LOCKS){ b.innerHTML='<div class="card2">Loading\u2026</div>'; return; }
+  const rows=(LOCKS||[]).map(function(m){
+    const state = !m.entries ? 'empty' : m.locked===m.entries ? 'locked' : m.locked ? 'part' : 'open';
+    const lab = {empty:'no entries', locked:'Locked', part:m.locked+' of '+m.entries+' locked', open:'Open'}[state];
+    const cls = {empty:'', locked:'pillr warn2', part:'pillr warn2', open:'pillr'}[state];
+    return '<tr><td><b>'+esc(m.month)+'</b></td>'+
+      '<td><span class="'+cls+'">'+lab+'</span></td>'+
+      '<td class="n">'+m.entries+'</td><td class="n">'+m.hours+'</td><td class="n">'+m.people+'</td>'+
+      '<td>'+(m.entries?('<button class="tbtn sm" data-lk="'+m.first_day+'" data-on="'+(state==='locked'?'0':'1')+'">'+
+        (state==='locked'?'Unlock':'Lock')+'</button>'):'')+'</td></tr>';
+  }).join('');
+  b.innerHTML='<div class="caveat"><b>Nothing locks itself.</b> A month stays open until an admin closes it here \u2014 '+
+    'do that once Finance has reconciled it and nobody is still back-filling. '+
+    'While a month is locked, editors cannot change or delete their entries in it (they still see them); admins can. Unlock puts it back.</div>'+
+    '<div class="tblwrap"><table class="adm"><thead><tr><th>Month</th><th>State</th><th class="n">Entries</th>'+
+    '<th class="n">Hours</th><th class="n">People</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<p class="note">Locking writes to every entry in the month, so give it a few seconds on a full month. Imported Clockify hours lock the same way as hours logged in Cronus.</p>';
+  b.querySelectorAll('[data-lk]').forEach(function(btn){ btn.onclick=async function(){
+    const on=btn.dataset.on==='1'; btn.disabled=true;
+    const r=await sb.rpc('admin_month_lock',{p_month:btn.dataset.lk,p_locked:on});
+    btn.disabled=false;
+    if(r.error) return toast(friendly(r.error),true);
+    toast(on?('Locked '+(r.data.locked||0)+' entries'):('Unlocked '+(r.data.unlocked||0)+' entries'));
+    await admLoad(true);
+  }; });
 }
 
 /* ---- people ---- */
