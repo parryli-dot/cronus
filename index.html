@@ -13,7 +13,7 @@
     --line:#E2E8F0; --ring:#E2E8F0; --axis:#CBD5E1;
     --booked:#4F46E5; --booked-soft:#EEF2FF; --booked-line:#C7D2FE; --booked-deep:#3730A3;
     --unbooked:#D97706; --unbooked-soft:#FFFBEB; --unbooked-line:#FDE68A; --unbooked-deep:#92400E;
-    --good:#16A34A; --crit:#DC2626; --good-text:#15803D; --warn-text:#B45309;
+    --good:#16A34A; --crit:#DC2626; --good-text:#15803D; --warn:#F59E0B; --warn-text:#B45309;
     --wash:#F1F5F9; --r:10px; --rail:206px;
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
@@ -891,8 +891,10 @@ $('#signout').onclick = async function(){ await sb.auth.signOut(); location.relo
 function gateMsg(t,m,n){ $('#gTitle').textContent=t; $('#gMsg').textContent=m;
   $('#gNote').textContent=n||''; $('#signin').style.display='none'; }
 
+let booting=false;
 async function start(){
-  const s = await sb.auth.getSession(); if(!s.data.session) return;
+  if(booting) return; booting=true;
+  const s = await sb.auth.getSession(); if(!s.data.session){ booting=false; return; }
   const r = await sb.rpc('bootstrap',{p_days:60});
   if(r.error){ gateMsg('Cronus could not start', r.error.message,'Send this to Parry.'); return; }
   const d=r.data;
@@ -1022,13 +1024,6 @@ async function exitPreview(){
   applyChrome('admin'); pvCaption('');
   goPanel('log'); renderAll();
 }
-function goPanel(k){
-  $$('.rail a').forEach(function(x){x.classList.toggle('on', x.dataset.go===k);});
-  $$('.panel').forEach(function(p){p.classList.remove('on');});
-  $('#p-'+k).classList.add('on');
-  if(k==='jobs') loadJobs();
-}
-
 /* ---------- stages ---------- */
 const stageById = id => (S.stages.filter(function(s){return s.id===id;})[0]||null);
 const stageName = id => { const s=stageById(id); return s?s.name:null; };
@@ -1339,6 +1334,7 @@ const stamp = (date,t) => t==null ? null : date+'T'+t2s(t)+':00+08:00';
 // the finish timestamp lands on the next calendar day when the entry ran past midnight; entry_date stays the start day
 const endStamp = (date,a,b) => stamp(crossesDay(a,b) ? shift(date,1) : date, b);
 async function insertEntry(row){
+  if(guardRO()) return null;   // ⧉、日曆拖拉、>16h 確認都由呢度入，守衛唔可以只擺喺 tryAdd
   const a=row.start?parseTime(row.start):null, b=row.end?parseTime(row.end):null;
   const r=await sb.from('time_entries').insert({
     user_id:S.me.id, project_id:row.project_id, task_id:row.task_id,
@@ -1431,6 +1427,10 @@ const bookedFor = d => ENTRIES.filter(function(e){return e.date===d && TASK[e.ta
 function renderDays(){
   const set={}; ENTRIES.forEach(function(e){ set[e.date]=1; }); set[selDate]=1;
   const dates=Object.keys(set).sort().reverse().slice(0,10);
+  // 打開緊嘅嗰筆一定要喺頁面上，就算佢舊過最近十日（Fix the oldest、日曆琥珀 chip 都會跳去舊日子）
+  const keep=[selDate]; if(openEdit){ const oe=ENTRIES.filter(function(e){return String(e.id)===openEdit;})[0]; if(oe) keep.push(oe.date); }
+  keep.forEach(function(d){ if(d && dates.indexOf(d)<0) dates.push(d); });
+  dates.sort().reverse();
   $('#days').innerHTML=dates.map(function(d){
     const rows=ENTRIES.filter(function(e){return e.date===d;})
       .sort(function(a,b){ const x=startMins(a), y=startMins(b);
@@ -1526,10 +1526,11 @@ function sheetHint(e){
 }
 function wireSheet(){
   const e=ENTRIES.filter(function(x){return String(x.id)===openEdit;})[0]; if(!e) return;
+  if(!$('#sA')) return;   // 面板未渲染就唔好摸落去，否則 renderAll 會斷喺呢度
   ['sA','sB','sDate'].forEach(function(id){ const x=$('#'+id); x.oninput=x.onchange=function(){ sheetHint(e); }; });
   sheetHint(e);
   $('#sCancel').onclick=function(){ openEdit=null; renderDays(); };
-  $('#sDel').onclick=async function(){ openEdit=null; await removeEntry(e); toast('Entry deleted'); };
+  $('#sDel').onclick=async function(){ openEdit=null; if(await removeEntry(e)) toast('Entry deleted'); };
   $('#sSave').onclick=async function(){
     const a=parseTime($('#sA').value), b=parseTime($('#sB').value);
     const t=TASK[e.task_id]||{};
@@ -1776,21 +1777,24 @@ function weekRows(){
 const cellMins=(task,date)=>ENTRIES.filter(function(e){return e.task_id===task&&e.date===date;})
   .reduce(function(a,e){return a+e.mins;},0);
 async function setCell(task,date,mins){
-  if(guardRO()){ renderWeek(); return; }
+  if(guardRO()){ renderWeek(); return false; }
   const hits=ENTRIES.filter(function(e){return e.task_id===task&&e.date===date;});
-  if(!mins){ for(const h of hits) await removeEntry(h); return; }
+  if(!mins){ let ok=true; for(const h of hits){ if(!(await removeEntry(h))) ok=false; } return ok; }
   if(hits.length){
     const h=hits[0];
     const patch = h.start ? {mins:mins,end:t2s(parseTime(h.start)+mins)} : {mins:mins};
-    await patchEntry(h,patch);
+    // 其餘幾筆只有喺第一筆真係收咗新數之後先算多餘，改唔到就一筆都唔好刪
+    if(!(await patchEntry(h,patch))){ renderWeek(); return false; }
     for(let i=1;i<hits.length;i++) await removeEntry(hits[i]);
+    return true;
   } else {
     const t=TASK[task];
     const row={ id:tempId(),task_id:task,project_id:t.project_id,date:date,mins:mins,
                 start:null,end:null,stage:t.suggest||null,note:'',source:'grid',locked:false,_p:true };
     ENTRIES.push(row); renderAll();
     const saved=await insertEntry(row);
-    if(saved){ Object.assign(row,saved); delete row._p; } else ENTRIES=ENTRIES.filter(function(e){return e!==row;});
+    if(saved){ Object.assign(row,saved); delete row._p; return true; }
+    ENTRIES=ENTRIES.filter(function(e){return e!==row;}); return false;
   }
 }
 function renderWeek(){
@@ -1828,8 +1832,8 @@ function renderWeek(){
       if(m===null){ toast('Try 1.5, 90m or 1:30',true); inp.value=''; return; }
       const t=TASK[inp.dataset.task];
       if(m&&t.booked&&!t.suggest){ toast('That deliverable needs a stage — set one on the Log screen first',true); inp.value=''; return; }
-      await setCell(inp.dataset.task,inp.dataset.date,m);
-      $('#wkSaved').textContent='saved'; renderAll();
+      const ok=await setCell(inp.dataset.task,inp.dataset.date,m);
+      $('#wkSaved').textContent=ok?'saved':''; renderAll();
     };
   });
   // chart
@@ -1849,11 +1853,12 @@ function renderWeek(){
 $('#wPrev').onclick=function(){ weekMon=shift(weekMon,-7); renderWeek(); };
 $('#wNext').onclick=function(){ weekMon=shift(weekMon,7); renderWeek(); };
 $('#copyLast').onclick=async function(){
+  if(guardRO()) return;
   const prev=weekDays(shift(weekMon,-7)), cur=weekDays(weekMon); let n=0;
   for(let i=0;i<5;i++){
     if(cur[i]>S.today) continue;
     const tasks=[]; ENTRIES.forEach(function(e){ if(e.date===prev[i]&&tasks.indexOf(e.task_id)<0) tasks.push(e.task_id); });
-    for(const id of tasks){ if(cellMins(id,cur[i])) continue; await setCell(id,cur[i],cellMins(id,prev[i])); n++; }
+    for(const id of tasks){ if(cellMins(id,cur[i])) continue; if(await setCell(id,cur[i],cellMins(id,prev[i]))) n++; }
   }
   renderAll(); toast(n?('Copied '+n+' cells from last week'):'Nothing to copy \u2014 every cell last week filled is already filled this week (or falls after today)',!n);
 };
@@ -1926,6 +1931,7 @@ function restoreTimer(){
     if(t.date!==S.today || !TASK[t.task]){ localStorage.removeItem(TKEY); return; }
     selTask=t.task; selStage=t.stage||null; tStartMin=t.startMin;
     tSecs=Math.floor((Date.now()-t.startedAt)/1000);
+    if(timer) clearInterval(timer);
     timer=setInterval(tick,1000); paintTimer();
     toast('Timer restored — still running');
   }catch(e){}
@@ -2135,7 +2141,7 @@ function fillRepFilters(){
       people.map(function(u){ return '<option value="'+u.user_id+'">'+esc(u.name)+'</option>'; }).join('');
     if(VIEW_AS){ const n=people.length; $('#rUser').value=n>1?'':VIEW_AS.id; $('#repSub').textContent='Preview: '+VIEW_AS.name+(pvScope()?(n>1?' and the '+(n-1)+' people in their scope':' only'):' — sees everyone, like you')+(S.me.is_admin?' · amounts visible':' · amounts hidden')+'.'; return; }
     $('#repSub').textContent='You can report on '+(res.data||[]).length+
-      (res.data.length===1?' person':' people')+(S.me.is_admin?' · amounts visible':' · amounts hidden');
+      ((res.data||[]).length===1?' person':' people')+(S.me.is_admin?' · amounts visible':' · amounts hidden');
   });
 }
 async function runReport(){
@@ -2357,8 +2363,8 @@ function renderDetailed(rows){
         '<td class="n">'+hm(e.mins)+'</td>'+(a?'<td class="n">'+money(e.amount).replace('HKD ','')+'</td>':'')+'</tr>'+ed;
     }).join(''):'<tr><td colspan="9">Nothing in range.</td></tr>')+
     '</tbody></table></div><p class="note">'+rows.length+' entries. Export with the CSV button.'+
-    ((S.me.is_admin||S.me.is_manager)?' Click any row to edit or delete it.':'')+'</p>';
-  if((S.me.is_admin||S.me.is_manager) && !VIEW_AS) wireDetailedEdit();
+    ((S.me.is_admin||S.me.is_manager)&&!VIEW_AS&&!layoutPreview()?' Click any row to edit or delete it.':'')+'</p>';
+  if((S.me.is_admin||S.me.is_manager) && !VIEW_AS && !layoutPreview()) wireDetailedEdit();
 }
 function renderWeekly(rows){
   const from=$('#rFrom').value, to=$('#rTo').value;
@@ -2432,7 +2438,7 @@ async function runDash(){
   const rr=($('#rRound')?$('#rRound').value:'15|up').split('|');
   const dargs={p_from:r[0],p_to:r[1],p_round:+rr[0],p_mode:rr[1]}; if(VIEW_AS&&pvScope()) dargs.p_users=pvScope();
   const res=await sb.rpc('report_data',dargs);
-  if(res.error) return toast(friendly(res.error),true);
+  if(res.error||!res.data) return toast(res.error?friendly(res.error):'The dashboard came back empty — press Refresh',true);
   if(VIEW_AS&&!S.me.is_admin) res.data.can_see_amounts=false;
   const rows=res.data.rows||[], tot=rows.reduce(function(a,e){return a+e.mins;},0);
   const amt=rows.reduce(function(a,e){return a+(e.amount||0);},0);
@@ -2535,6 +2541,7 @@ function admLock(b){
     '<th class="n">Hours</th><th class="n">People</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
     '<p class="note">Locking writes to every entry in the month, so give it a few seconds on a full month. Imported Clockify hours lock the same way as hours logged in Cronus.</p>';
   b.querySelectorAll('[data-lk]').forEach(function(btn){ btn.onclick=async function(){
+    if(guardRO()) return;
     const on=btn.dataset.on==='1'; btn.disabled=true;
     const r=await sb.rpc('admin_month_lock',{p_month:btn.dataset.lk,p_locked:on});
     btn.disabled=false;
@@ -2607,6 +2614,7 @@ function admPeople(b){
       if(pilot!==before.pilot) args.p_pilot=pilot;
       if(status!==before.status) args.p_status=status;
       let ok=true;
+      if(guardRO()){ btn.disabled=false; return; }
       if(Object.keys(args).length>1){
         const r=await sb.rpc('admin_set_user',args);
         if(r.error){ toast(friendly(r.error),true); ok=false; }
@@ -2687,6 +2695,7 @@ function admTags(b){
    'Archiving keeps history intact and removes it from the picker. A stage that is already used cannot be deleted, only archived.</p>';
   b.querySelectorAll('tbody tr').forEach(function(tr){
     tr.querySelector('.sv2').onclick=async function(){
+      if(guardRO()) return;
       const r=await sb.rpc('admin_tag_save',{
         p_id:tr.dataset.t||null, p_name:tr.querySelector('.tName').value,
         p_kind:tr.querySelector('.tKind').value, p_sort:+tr.querySelector('.tSort').value,
@@ -2755,6 +2764,7 @@ function admRules(b){
     per.onchange();
     if(rid){ const rr=RULES.filter(function(x){return x.id===rid;})[0]; if(rr&&rr.group_id) g.value=rr.group_id; }
     tr.querySelector('.sv2').onclick=async function(){
+      if(guardRO()) return;
       const r=await sb.rpc('admin_rule_save',{
         p_id:rid||null, p_comparator:tr.querySelector('.rCmp').value,
         p_threshold_min:Math.round(parseFloat(tr.querySelector('.rThr').value||'0')*60),
@@ -2765,6 +2775,7 @@ function admRules(b){
       toast('Rule saved'); await admLoad(true);
     };
     if(tr.querySelector('.rDel')) tr.querySelector('.rDel').onclick=async function(){
+      if(guardRO()) return;
       const r=await sb.rpc('admin_rule_delete',{p_id:rid});
       if(r.error) return toast(friendly(r.error),true); toast('Rule deleted'); await admLoad(true); };
     if(tr.querySelector('.rDry')) tr.querySelector('.rDry').onclick=async function(){
@@ -2810,6 +2821,7 @@ function wireDetailedEdit(){
   const host=$('#rBody tr.editrow'); if(!host) return;
   const e=(REP.rows||[]).filter(function(x){return String(x.id)===repEdit;})[0]; if(!e) return;
   $('#eSave').onclick=async function(){
+    if(guardRO()) return;
     const a=parseTime($('#eA').value), b2=parseTime($('#eB').value);
     const both=$('#eA').value.trim()&&$('#eB').value.trim();
     const patch={ entry_date:$('#eD').value, stage_tag_id:$('#eS').value||null,
@@ -2827,6 +2839,7 @@ function wireDetailedEdit(){
   };
   $('#eCancel').onclick=function(){ repEdit=null; renderReport(); };
   $('#eDel').onclick=async function(){
+    if(guardRO()) return;
     const r=await sb.from('time_entries').delete().eq('id',e.id);
     if(r.error) return toast(friendly(r.error),true);
     repEdit=null; toast('Entry deleted'); runReport();
