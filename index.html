@@ -2644,6 +2644,20 @@ function admTags(b){
 }
 
 /* ---- reminder rules ---- */
+const ISODOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+// weekly rules fire on a weekday, monthly rules on a day of the month, daily rules every weekday
+function sendOnCell(r){
+  const per=r?r.period:'weekly', d=(r&&r.days&&r.days.length)?r.days[0]:(per==='monthly'?25:1);
+  return '<span class="soWk"'+(per==='monthly'?' style="display:none"':'')+'><select class="rDow">'+
+      ISODOW.map(function(n,i){ return '<option value="'+(i+1)+'" '+(d===i+1?'selected':'')+'>'+n+'</option>'; }).join('')+'</select></span>'+
+    '<span class="soMo"'+(per==='monthly'?'':' style="display:none"')+'>day <input class="rate rDom" style="width:52px" value="'+(per==='monthly'?d:25)+'"></span>';
+}
+function sendOnDays(tr){
+  const per=tr.querySelector('.rPer').value;
+  if(per==='daily') return [1,2,3,4,5];
+  if(per==='monthly'){ const n=Math.min(28,Math.max(1,parseInt(tr.querySelector('.rDom').value,10)||25)); return [n]; }
+  return [parseInt(tr.querySelector('.rDow').value,10)||1];
+}
 function admRules(b){
   if(!RULES){ b.innerHTML='<div class="card2">Loading…</div>'; return; }
   const gopts=(GROUPS||[]).map(function(g){ return '<option value="'+g.id+'">'+esc(g.name)+'</option>'; }).join('');
@@ -2656,7 +2670,9 @@ function admRules(b){
         '<option value="more" '+(r&&r.comparator==='more'?'selected':'')+'>tracks more than</option></select></td>'+
       '<td class="n"><input class="rate rThr" value="'+(r?Math.round(r.threshold_min/60*10)/10:10)+'"> h</td>'+
       '<td><select class="rPer"><option value="weekly" '+(!r||r.period==='weekly'?'selected':'')+'>per week</option>'+
-        '<option value="daily" '+(r&&r.period==='daily'?'selected':'')+'>per day</option></select></td>'+
+        '<option value="daily" '+(r&&r.period==='daily'?'selected':'')+'>per day</option>'+
+        '<option value="monthly" '+(r&&r.period==='monthly'?'selected':'')+'>per month</option></select></td>'+
+      '<td>'+sendOnCell(r)+'</td>'+
       '<td><select class="rGrp"><option value="">Everyone tracking</option>'+gopts+'</select></td>'+
       '<td><select class="rNot"><option value="self" '+(!r||r.notify==='self'?'selected':'')+'>tell them</option>'+
         '<option value="managers" '+(r&&r.notify==='managers'?'selected':'')+'>tell managers</option></select></td>'+
@@ -2664,22 +2680,29 @@ function admRules(b){
         (r?' <button class="cn rDry" style="padding:5px 9px;font-size:12.5px">Test</button>'+
             ' <button class="del rDel" style="padding:5px 9px;font-size:12.5px">Delete</button>':'')+'</td></tr>';
   };
-  b.innerHTML='<div class="caveat"><b>Rules are stored but nothing sends yet.</b> Delivery needs either a '+
-   'time-driven Apps Script trigger in PACMAN (which already holds Gmail send permission) or an email provider. '+
-   'Use <b>Test</b> to see exactly who a rule would notify right now.</div>'+
+  b.innerHTML='<div class="caveat"><b>Mail is live.</b> A tick runs every morning at 09:00 Hong Kong time and sends the rules that are due that day: '+
+   'weekly rules on their weekday, monthly rules on their day of the month. Each person gets one mail per rule per period. '+
+   'Use <b>Test</b> to see exactly who a rule would notify right now, without sending anything.</div>'+
    '<div class="tblwrap"><table class="adm"><thead><tr><th>State</th><th>Condition</th><th class="n">Threshold</th>'+
-   '<th>Period</th><th>Applies to</th><th>Notify</th><th></th></tr></thead><tbody>'+
+   '<th>Period</th><th>Send on</th><th>Applies to</th><th>Notify</th><th></th></tr></thead><tbody>'+
    RULES.map(row).join('')+row(null)+'</tbody></table></div>'+
    '<div id="dryOut"></div>'+
-   '<p class="note">On the 2026 evidence a daily rule would fire at almost everyone, so weekly is the sensible default.</p>';
+   '<p class="note">Weekly looks at last week, monthly at this month so far \u2014 so a monthly rule set to the 25th is the month-end chase, sent while there is still time to fill the gaps. '+
+   'Applies to narrows the rule to one group (Groups tab); Everyone tracking means every active person expected to log time. '+
+   'On the 2026 evidence a daily rule would fire at almost everyone, so weekly or monthly is the sensible default.</p>';
   b.querySelectorAll('tbody tr').forEach(function(tr){
     const g=tr.querySelector('.rGrp'); const rid=tr.dataset.r;
+    const per=tr.querySelector('.rPer');
+    per.onchange=function(){ const mo=per.value==='monthly', dy=per.value==='daily';
+      tr.querySelector('.soWk').style.display=(mo||dy)?'none':'';
+      tr.querySelector('.soMo').style.display=mo?'':'none'; };
+    per.onchange();
     if(rid){ const rr=RULES.filter(function(x){return x.id===rid;})[0]; if(rr&&rr.group_id) g.value=rr.group_id; }
     tr.querySelector('.sv2').onclick=async function(){
       const r=await sb.rpc('admin_rule_save',{
         p_id:rid||null, p_comparator:tr.querySelector('.rCmp').value,
         p_threshold_min:Math.round(parseFloat(tr.querySelector('.rThr').value||'0')*60),
-        p_period:tr.querySelector('.rPer').value, p_days:[1,2,3,4,5],
+        p_period:tr.querySelector('.rPer').value, p_days:sendOnDays(tr),
         p_notify:tr.querySelector('.rNot').value, p_group:g.value||null,
         p_enabled:tr.querySelector('.rEnabled').value==='1', p_role:null});
       if(r.error) return toast(friendly(r.error),true);
@@ -2695,7 +2718,7 @@ function admRules(b){
       $('#dryOut').innerHTML='<div class="card2" style="margin-top:12px"><h3>Would notify '+
         d.would_notify+' '+(d.would_notify===1?'person':'people')+' right now</h3>'+
         (d.who&&d.who.length?'<div class="tblwrap"><table class="adm"><thead><tr><th>Person</th>'+
-          '<th class="n">Logged this '+(d.period==='weekly'?'week':'day')+'</th></tr></thead><tbody>'+
+          '<th class="n">Logged this '+(d.period==='weekly'?'week':d.period==='monthly'?'month':'day')+'</th></tr></thead><tbody>'+
           d.who.map(function(w){ return '<tr><td>'+esc(w.name)+'</td><td class="n">'+hm(w.minutes)+'</td></tr>'; }).join('')+
           '</tbody></table></div>':'<p class="note" style="margin:0"><b style="color:var(--good-text)">Nobody — everyone is above the threshold.</b></p>')+
         '</div>'; };
