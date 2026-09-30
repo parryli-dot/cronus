@@ -552,7 +552,7 @@
           <input class="desc" id="desc" placeholder="Note (optional)">
           <button class="add" id="addBtn" disabled>Add</button>
         </div>
-        <div class="kb">Finish accepts a time (<kbd>11:00</kbd>) or a length (<kbd>1.5</kbd>, <kbd>90m</kbd>) &middot;
+        <div class="kb">Finish accepts a time (<kbd>11:00</kbd>) or a length (<kbd>2h</kbd>, <kbd>1.5</kbd>, <kbd>90m</kbd>) &mdash; check the end time shown &middot;
           <kbd>&larr;</kbd> <kbd>&rarr;</kbd> change day &middot; <kbd>Enter</kbd> saves</div>
         <div class="guard" id="guard"></div>
         <div class="saved" id="saved"></div>
@@ -816,7 +816,7 @@ const DAY_START = 6*60, DAY_END = 23*60, HH = 46, SNAP = 15;   // grid 06:00–2
 const isNarrow = () => matchMedia('(max-width: 900px)').matches;
 
 let S=null, TASK={}, ENTRIES=[];
-let selDate, selTask=null, selStage=null, weekMon, calMon, openEdit=null, dTab='mine', pendingBig=null;
+let selDate, selTask=null, selStage=null, weekMon, calMon, openEdit=null, dTab='mine', pendingBig=null, sheetBig={key:null,at:0};
 let searchRows=[], searchTimer=null, tmpSeq=0, drag=null;
 
 function toast(msg,bad){ const t=$('#toast'); t.textContent=msg; t.className='toast show'+(bad?' err':'');
@@ -848,6 +848,23 @@ function parseTime(raw){
   if(h>23||mi>59) return null;
   return h*60+mi;
 }
+// Finish box: a bare hour count 1–12 that, read as a clock time, would run more than 8 hours past the start
+// into the next day is a length — 10:30 then "2" is two hours, not 02:00 tomorrow; 22:00 then "2" stays 02:00.
+// "1.5" and "90m" are lengths as before; colons, am/pm and "1.30" stay clock times (big ones get a confirm).
+function parseFinish(raw,a){
+  const s=String(raw||'').trim(), b=parseTime(s);
+  if(a!==null && b!==null && /^(?:[1-9]|1[0-2])$/.test(s) && b<=a && b+1440-a>480) return a+(+s)*60;
+  if(a!==null && b===null){ const d=parseDur(s); if(d) return a+d; }
+  return b;
+}
+// A My week cell holds a length, so "1:30" there is ninety minutes. "1.30" could be 1 h 30 or 1.3 h, so it is
+// refused (the cell asks for 1:30 or 1.5); quarter decimals .00/.25/.50/.75 and anything else read as parseDur.
+function weekMins(raw){
+  const s=String(raw||'').trim();
+  let m=s.match(/^(\d{1,2}):([0-5]\d)$/); if(m) return +m[1]<=23 ? +m[1]*60 + +m[2] : null;
+  m=s.match(/^\d{1,2}[.,](\d\d)$/); if(m && +m[1]<=59 && !/^(00|25|50)$/.test(m[1])) return null;
+  return parseDur(s);
+}
 const t2s = t => t==null ? '' : pad(Math.floor(t/60)%24)+':'+pad(t%60);
 const snap = t => Math.round(t/SNAP)*SNAP;
 const startMins = e => e.start ? parseTime(e.start) : null;
@@ -855,6 +872,25 @@ const startMins = e => e.start ? parseTime(e.start) : null;
 // midnight and finished the next day (23:00 -> 01:00 = 120). b may exceed 1440 when it came from a duration.
 const spanMins = (a,b) => (a==null||b==null) ? null : (b>=a ? b-a : b+1440-a);
 const crossesDay = (a,b) => a!=null && b!=null && b<a;
+// A big entry needs a second look before it saves: over 16 hours, or running past midnight for more than 4
+// (usually a length typed as a clock time — 10:30 then "1:30" reads as 01:30 the next day, 19:00 then "2" as 02:00).
+function needsConfirm(a,b,mins){ return mins>960 || ((crossesDay(a,b) || b>=1440) && mins>240); }
+// From noon on, a bare "5" read as five hours could also mean 5 pm: returns that pm time when it falls within
+// 8 hours after the start and differs from the reading used, so the person can pick; otherwise null.
+function pmAlt(a,raw,b){
+  const s=String(raw||'').trim();
+  if(a===null || b===null || a<720 || !/^(?:[1-9]|1[01])$/.test(s)) return null;
+  const pm=(+s+12)*60;
+  return (pm>a && pm-a<=480 && pm!==b) ? pm : null;
+}
+// Edit panels: the first press on a big entry warns and relabels Save; a later press with the same values
+// saves. A press within 0.7 s is the other half of a double-click and does not count.
+function confirmBig(state,key,btn,msg){
+  const now=Date.now();
+  if(state.key===key){ if(now-state.at<700) return false; state.key=null; return true; }
+  state.key=key; state.at=now; btn.textContent='Save anyway'; toast(msg,true);
+  return false;
+}
 const BACKFILL_DAYS = 14;   // matches v_time_quality: later than this is flagged, never blocked
 const daysBack = d => Math.round((toD(S.today)-toD(d))/864e5);
 // timed entries touching `date`, as [a,b) minutes from that day's midnight — includes yesterday's entries that ran past midnight
@@ -926,7 +962,7 @@ function applyBoot(d){
   ENTRIES = S.entries.map(function(e){ e.mins=+e.mins; return e; });
   S.isSalesAdmin = !!d.is_sales_admin;
   selDate=S.today; weekMon=monday(S.today); calMon=monday(S.today);
-  selTask=null; selStage=null; openEdit=null; pendingBig=null; REP=null; JOBS=null; jobsOpen=null;
+  selTask=null; selStage=null; openEdit=null; pendingBig=null; REP=null; JOBS=null; jobsOpen=null; sheetBig.key=null; repBig.key=null;
   $('#whoami').textContent = S.me.name+' · '+S.me.role.replace('_',' ')+(VIEW_AS?' · preview':'');
   buildTargets(); fillRepFilters();
 }
@@ -1064,9 +1100,7 @@ function nextFreeStart(date){
 }
 function currentTimes(){
   const a=parseTime($('#tStart').value);
-  let b=parseTime($('#tEnd').value);
-  if(b===null && a!==null){ const dur=parseDur($('#tEnd').value); if(dur) b=a+dur; }
-  return {a:a,b:b};
+  return {a:a, b:parseFinish($('#tEnd').value,a)};
 }
 function paintBar(){
   const lab=$('#dLab');
@@ -1096,7 +1130,10 @@ function paintBar(){
   const mins = spanMins(tt.a,tt.b);
   const out=$('#durOut');
   out.className='dur'+(mins!==null&&mins>720?' warn':'');
-  out.textContent = mins===null ? '—' : (mins<=0 ? 'no time in between' : hm(mins)+(crossesDay(tt.a,tt.b)?' · ends next day':''));
+  // say where the entry ends whenever the box does not already show that clock time ("2" -> ends 12:30)
+  const next=crossesDay(tt.a,tt.b)||tt.b>=1440, typed=$('#tEnd').value.trim();
+  out.textContent = mins===null ? '—' : (mins<=0 ? 'no time in between' : hm(mins)+
+    (typed!==t2s(tt.b) ? ' · ends '+t2s(tt.b)+(next?' +1':'') : (next?' · ends next day':'')));
   $('#addBtn').disabled = $('#addBtn').classList.contains('done') || !(selTask && mins>0 && !(stageRequired()&&!sid));
   $('#addBtn').title = !selTask ? 'Pick a deliverable first' : (stageRequired()&&!sid) ? 'Booked work needs a stage — click the Stage chip' : !(mins>0) ? 'Fill in the times' : '';
   $('#calSel').textContent = selTask ? ('Dragging will log: '+TASK[selTask].name) : 'Pick a deliverable first — drag then fills it in.';
@@ -1106,9 +1143,23 @@ function paintGuard(mins,a){
   const g=$('#guard'); g.className='guard'; g.innerHTML='';
   if(pendingBig){
     g.className='guard on hard';
-    g.innerHTML='<span>&#9888; <b>'+hm(pendingBig.mins)+'</b> in one entry on '+fmt(pendingBig.date)+' &mdash; over 16 hours.</span>'+
-      '<button id="gYes">Save it anyway</button><button id="gNo">Let me fix it</button>';
-    $('#gYes').onclick=function(){ const p=pendingBig; pendingBig=null; commit(p); };
+    if(pendingBig._pm!=null){   // "5" after 14:00: keep five hours, or switch to 17:00
+      const p=pendingBig;
+      g.innerHTML='<span>&#9888; <b>'+esc(p._typed)+'</b> reads as <b>'+hm(p.mins)+'</b>, until '+esc(p.end)+(p._next?' +1':'')+
+        '. Or did you mean until <b>'+t2s(p._pm)+'</b>?</span>'+
+        '<button id="gYes">Keep '+hm(p.mins)+'</button><button id="gPm">Until '+t2s(p._pm)+'</button><button id="gNo">Let me fix it</button>';
+    } else {
+      g.innerHTML='<span>&#9888; <b>'+hm(pendingBig.mins)+'</b> in one entry on '+fmt(pendingBig.date)+' &mdash; '+(pendingBig.mins>960?'over 16 hours.':pendingBig._clock?'it ends the next day at '+esc(pendingBig.end)+'. Meant a length? '+
+        (/^\d{1,2}$/.test(pendingBig._typed||'')?'Type <b>'+esc(pendingBig._typed)+'h</b>.':'Type <b>1h30</b> or <b>1.5</b>.'):'it runs past midnight. Is the length right?')+'</span>'+
+        '<button id="gYes">Save it anyway</button><button id="gNo">Let me fix it</button>';
+    }
+    $('#gYes').onclick=function(){ const p=pendingBig; pendingBig=null;
+      // only save the entry the warning was about: if the boxes changed since, it has to be checked again
+      if(pendingStale(p) || p.end!==t2s(currentTimes().b)){ paintBar(); return toast('The entry changed — check it and press Add again',true); }
+      commit(p); };
+    if($('#gPm')) $('#gPm').onclick=function(){ const p=pendingBig; pendingBig=null;
+      if(pendingStale(p) || $('#tEnd').value.trim()!==p._typed){ paintBar(); return toast('The entry changed — check it and press Add again',true); }
+      $('#tEnd').value=t2s(p._pm); paintBar(); tryAdd(); };   // the clock reading, checked and saved like any other
     $('#gNo').onclick=function(){ pendingBig=null; paintBar(); $('#tEnd').focus(); };
     return;
   }
@@ -1126,8 +1177,14 @@ function paintGuard(mins,a){
   g.innerHTML=hints.map(function(h){ return '<span>'+h+'</span>'; }).join('')+'<span style="color:var(--muted)">Still saves.</span>';
 }
 function resetTimes(){
+  pendingBig=null;   // new day or fresh times: a warning about the old entry no longer applies
   const a=nextFreeStart(selDate);
   $('#tStart').value=t2s(a); $('#tEnd').value=t2s(Math.min(a+60,DAY_END));
+}
+// A big-entry warning is about one exact entry: stale once the day, deliverable, start, note or stage changed
+function pendingStale(p){
+  const tt=currentTimes();
+  return !p || p.task_id!==selTask || p.date!==selDate || p.start!==t2s(tt.a) || p.note!==$('#desc').value.trim() || p.stage!==effStage();
 }
 
 /* ---------- picker ---------- */
@@ -1169,7 +1226,7 @@ function renderRows(){
   $$('#rows .row').forEach(function(el){ el.onclick=function(){
     const id=el.dataset.id;
     if(!TASK[id]){ const f=set.filter(function(x){return x.task_id===id;})[0]; TASK[id]=f; TASK[id].suggest=null; }
-    selTask=id; selStage=null;
+    selTask=id; selStage=null; pendingBig=null;
     if(!TASK[id].suggest && TASK[id].booked) fetchSuggest(id);
     renderRows(); paintBar(); $('#tEnd').focus();
   }; });
@@ -1376,6 +1433,7 @@ async function removeEntry(e){
 }
 function tryAdd(){
   if(guardRO()) return;
+  pendingBig=null;   // a new press is judged afresh; an older warning must not be saved later by mistake
   const tt=currentTimes();
   if(!selTask) return toast('Pick a deliverable first',true);
   if(tt.a===null) { $('#tStart').focus(); return toast('Start time not understood — try 9:30 or 930',true); }
@@ -1388,7 +1446,11 @@ function tryAdd(){
   const row={ id:tempId(), task_id:selTask, project_id:TASK[selTask].project_id, date:selDate,
               mins:mins, start:t2s(tt.a), end:t2s(tt.b), stage:effStage(),
               note:$('#desc').value.trim(), source:'manual', locked:false, _p:true };
-  if(mins>960){ pendingBig=row; paintGuard(mins); return; }
+  row._clock = parseTime($('#tEnd').value)===tt.b;   // the finish was read as a clock time, not a length
+  row._typed = $('#tEnd').value.trim();
+  row._next = crossesDay(tt.a,tt.b) || tt.b>=1440;
+  row._pm = pmAlt(tt.a,row._typed,tt.b);   // "5" after 14:00: five hours, or 5 pm? ask
+  if(row._pm!==null || needsConfirm(tt.a,tt.b,mins)){ pendingBig=row; paintGuard(mins); return; }
   commit(row);
 }
 async function commit(row){
@@ -1466,7 +1528,7 @@ function renderDays(){
   $$('#days .tagchip.miss').forEach(function(b){ b.onclick=function(){
     const e=ENTRIES.filter(function(x){return String(x.id)===b.dataset.stage;})[0];
     openStageMenu(b,e.stage,function(s){ patchEntry(e,{stage:s}); }); }; });
-  if(openEdit) wireSheet();
+  if(openEdit) wireSheet(); else { sheetBig.open=null; sheetBig.key=null; }   // a closed panel forgets its pending confirm
 }
 function entryHTML(e){
   const t=TASK[e.task_id]||{name:'(unknown deliverable)',booked:true,client:''};
@@ -1510,7 +1572,7 @@ function sheetHTML(e){
 // live hint line under the sheet: what the save will do, plus the same soft warnings as the entry bar
 function sheetHint(e){
   const el=$('#sHint'); if(!el) return;
-  const d=$('#sDate').value, a=parseTime($('#sA').value), b=parseTime($('#sB').value);
+  const d=$('#sDate').value, a=parseTime($('#sA').value), b=parseFinish($('#sB').value,a);
   const bothBlank=!$('#sA').value.trim() && !$('#sB').value.trim();
   const mins = bothBlank ? e.mins : spanMins(a,b);
   const dow=$('#sDow'); if(dow) dow.textContent = d ? fmt(d)+(d===S.today?' (today)':'') : '';
@@ -1518,9 +1580,10 @@ function sheetHint(e){
   if(!d) parts.push('Pick a day.');
   else if(d!==e.date) parts.push('Moves this entry from <b>'+fmt(e.date)+'</b> to <b>'+fmt(d)+'</b>.');
   if(bothBlank) parts.push('Leave both times blank to keep it as a plain duration of '+hm(e.mins)+'.');
-  else if(a===null||b===null) parts.push('Times like 9:30 or 930.');
+  else if(a===null||b===null) parts.push('Times like 9:30 or 930 &mdash; the finish can also be a length like 2h or 1.5.');
   else if(mins<=0) parts.push('Start and finish are the same time.');
-  else if(crossesDay(a,b)) parts.push('Finishes the next day &mdash; '+hm(mins)+', counted on '+fmt(d||e.date)+'.');
+  else if(crossesDay(a,b)||b>=1440) parts.push('Finishes the next day at '+t2s(b)+' &mdash; '+hm(mins)+', counted on '+fmt(d||e.date)+'.');
+  else if($('#sB').value.trim()!==t2s(b)) parts.push('Ends '+t2s(b)+' &mdash; '+hm(mins)+'.');   // "2" read as a length: say where it ends
   if(d){
     const late=backfillText(d); if(late) parts.push(late);
     if(!bothBlank && mins>0){ const ov=overlapsOn(d,a,mins,e.id); if(ov.length) parts.push(overlapText(ov)); }
@@ -1528,14 +1591,15 @@ function sheetHint(e){
   el.innerHTML=parts.join(' ');
 }
 function wireSheet(){
+  if(sheetBig.open!==openEdit){ sheetBig.open=openEdit; sheetBig.key=null; }   // a newly opened panel starts without a pending confirm
   const e=ENTRIES.filter(function(x){return String(x.id)===openEdit;})[0]; if(!e) return;
   if(!$('#sA')) return;   // 面板未渲染就唔好摸落去，否則 renderAll 會斷喺呢度
   ['sA','sB','sDate'].forEach(function(id){ const x=$('#'+id); x.oninput=x.onchange=function(){ sheetHint(e); }; });
   sheetHint(e);
-  $('#sCancel').onclick=function(){ openEdit=null; renderDays(); };
+  $('#sCancel').onclick=function(){ sheetBig.key=null; openEdit=null; renderDays(); };
   $('#sDel').onclick=async function(){ openEdit=null; if(await removeEntry(e)) toast('Entry deleted'); };
   $('#sSave').onclick=async function(){
-    const a=parseTime($('#sA').value), b=parseTime($('#sB').value);
+    const a=parseTime($('#sA').value), b=parseFinish($('#sB').value,a);
     const t=TASK[e.task_id]||{};
     if(t.booked&&!$('#sS').value) return toast('Booked work needs a stage',true);
     const day=$('#sDate').value;
@@ -1549,8 +1613,14 @@ function wireSheet(){
       if(b===null) return toast('Finish time not understood',true);
       const mins=spanMins(a,b);   // finish earlier than start = finished the next day
       if(mins<=0) return toast('Start and finish are the same time',true);
+      const changed = t2s(a)!==(e.start||'') || t2s(b)!==(e.end||'');   // an untouched long entry saves as it is
+      const pm = pmAlt(a,$('#sB').value,b);
+      if(changed && (pm!==null || needsConfirm(a,b,mins)) && !confirmBig(sheetBig,[e.id,day,t2s(a),t2s(b)].join('|'),$('#sSave'),
+          pm!==null ? $('#sB').value.trim()+' reads as '+hm(mins)+', until '+t2s(b)+' — for '+t2s(pm)+' type '+t2s(pm)+', or press Save anyway'
+                    : hm(mins)+' in one entry'+(crossesDay(a,b)||b>=1440?', ending the next day':'')+' — press Save anyway if that is right')) return;
       patch.start=t2s(a); patch.end=t2s(b); patch.mins=mins;
     }
+    sheetBig.key=null;
     const moved = day!==e.date;
     openEdit=null;
     if(await patchEntry(e,patch)) toast(moved?'Saved — moved to '+fmt(day):'Saved');
@@ -1831,10 +1901,10 @@ function renderWeek(){
   $$('#wbody .cell').forEach(function(inp){
     inp.onfocus=function(){ inp.select(); };
     inp.onchange=async function(){
-      const v=inp.value.trim(), m=v===''?0:parseDur(v);
-      if(m===null){ toast('Try 1.5, 90m or 1:30',true); inp.value=''; return; }
+      const v=inp.value.trim(), m=v===''?0:weekMins(v);
+      if(m===null){ toast('Try 1.5, 90m or 1:30',true); inp.value=inp.defaultValue; return; }   // nothing saved: show what is stored
       const t=TASK[inp.dataset.task];
-      if(m&&t.booked&&!t.suggest){ toast('That deliverable needs a stage — set one on the Log screen first',true); inp.value=''; return; }
+      if(m&&t.booked&&!t.suggest){ toast('That deliverable needs a stage — set one on the Log screen first',true); inp.value=inp.defaultValue; return; }
       const ok=await setCell(inp.dataset.task,inp.dataset.date,m);
       $('#wkSaved').textContent=ok?'saved':''; renderAll();
     };
@@ -1888,7 +1958,18 @@ $('#pickBtn').onclick=function(e){
 $('#stageBtn').onclick=function(e){
   if(!selTask) return toast('Pick a deliverable first',true);
   openStageMenu(e.currentTarget,effStage(),function(s){ selStage=s; paintBar(); }); };
-$('#tStart').oninput=paintBar; $('#tEnd').oninput=paintBar;
+$('#tStart').oninput=$('#tEnd').oninput=function(){ pendingBig=null; paintBar(); };   // editing drops a pending big-entry warning
+// Time boxes select their text on focus, so a new time or length replaces the prefilled one instead of being
+// appended to it ("11:301.5"). The mouseup that ends the click would clear the selection, so it is skipped once.
+document.addEventListener('focusin',function(e){
+  const el=e.target;
+  if(!el.matches || !el.matches('#tStart,#tEnd,#sA,#sB,#eA,#eB')) return;
+  if(timer && (el.id==='tStart'||el.id==='tEnd')) return;   // a running timer rewrites these every second
+  el._selOnce=true;
+  setTimeout(function(){ if(document.activeElement===el){ try{ el.setSelectionRange(0,el.value.length); }catch(_){ el.select(); } } },0);
+  setTimeout(function(){ el._selOnce=false; },400);
+});
+document.addEventListener('mouseup',function(e){ const el=e.target; if(el && el._selOnce){ el._selOnce=false; e.preventDefault(); } });
 $('#tStart').onkeydown=function(e){ if(e.key==='Enter'){ $('#tEnd').focus(); } };
 $('#tEnd').onkeydown=function(e){ if(e.key==='Enter') tryAdd(); };
 $('#desc').onkeydown=function(e){ if(e.key==='Enter') tryAdd(); };
@@ -2870,7 +2951,7 @@ $$('.atab').forEach(function(b){ b.onclick=function(){
   aTab=b.dataset.a; admLoad(false); }; });
 
 /* ================= edit anyone's entry, from the Detailed report ================= */
-let repEdit=null;
+let repEdit=null, repBig={key:null,at:0};
 function wireDetailedEdit(){
   $$('#rBody tbody tr[data-e]').forEach(function(tr){
     tr.style.cursor='pointer';
@@ -2880,26 +2961,41 @@ function wireDetailedEdit(){
       renderReport();
     };
   });
+  if(repBig.open!==repEdit){ repBig.open=repEdit; repBig.key=null; }   // another row, or none: no pending confirm
   const host=$('#rBody tr.editrow'); if(!host) return;
   const e=(REP.rows||[]).filter(function(x){return String(x.id)===repEdit;})[0]; if(!e) return;
+  const eHint=function(){   // same as the entry bar: say where the entry ends when the box is not that clock time
+    const a=parseTime($('#eA').value), b=parseFinish($('#eB').value,a), el=$('#eHint'); if(!el) return;
+    if(a===null||b===null){ el.textContent=''; return; }
+    let mins=b-a; if(mins<=0) mins+=1440;
+    const next=crossesDay(a,b)||b>=1440;
+    el.textContent = ($('#eB').value.trim()!==t2s(b)||next) ? ' Ends '+t2s(b)+(next?' next day':'')+' — '+hm(mins)+'.' : '';
+  };
+  $('#eA').oninput=$('#eB').oninput=eHint; eHint();
   $('#eSave').onclick=async function(){
     if(guardRO()) return;
-    const a=parseTime($('#eA').value), b2=parseTime($('#eB').value);
+    const a=parseTime($('#eA').value), b2=parseFinish($('#eB').value,a);
     const both=$('#eA').value.trim()&&$('#eB').value.trim();
     const patch={ entry_date:$('#eD').value, stage_tag_id:$('#eS').value||null,
                   description:$('#eN').value.trim()||null, edited_by:S.me.id };
     if(both){
       if(a===null||b2===null) return toast('Times not understood',true);
       let mins=b2-a; if(mins<=0) mins+=1440;
+      const changed = t2s(a)!==(e.start||'') || t2s(b2)!==(e.end||'');   // an untouched long entry saves as it is
+      const pm = pmAlt(a,$('#eB').value,b2);
+      if(changed && (pm!==null || needsConfirm(a,b2,mins)) && !confirmBig(repBig,[repEdit,$('#eD').value,t2s(a),t2s(b2)].join('|'),$('#eSave'),
+          pm!==null ? $('#eB').value.trim()+' reads as '+hm(mins)+', until '+t2s(b2)+' — for '+t2s(pm)+' type '+t2s(pm)+', or press Save anyway'
+                    : hm(mins)+' in one entry'+(crossesDay(a,b2)||b2>=1440?', ending the next day':'')+' — press Save anyway if that is right')) return;
       patch.duration_sec=mins*60;
       patch.started_at=$('#eD').value+'T'+t2s(a)+':00+08:00';
       patch.ended_at=new Date(new Date(patch.started_at).getTime()+mins*60000).toISOString();
     }
+    repBig.key=null;
     const r=await sb.from('time_entries').update(patch).eq('id',e.id);
     if(r.error) return toast(friendly(r.error),true);
     repEdit=null; toast('Saved — '+e.user+'’s entry'); runReport();
   };
-  $('#eCancel').onclick=function(){ repEdit=null; renderReport(); };
+  $('#eCancel').onclick=function(){ repBig.key=null; repEdit=null; renderReport(); };
   $('#eDel').onclick=async function(){
     if(guardRO()) return;
     const r=await sb.from('time_entries').delete().eq('id',e.id);
@@ -2921,7 +3017,7 @@ function editRowHTML(e,cols){
     '<div class="sbtns"><button class="sv" id="eSave">Save</button>'+
       '<button class="cn" id="eCancel">Cancel</button><button class="del" id="eDel">Delete</button></div>'+
     '</div><p class="note" style="margin:9px 0 0">Editing <b>'+esc(e.user)+'</b>’s entry. '+
-    'Allowed because you are an admin or their manager.</p></td></tr>';
+    'Allowed because you are an admin or their manager.<span id="eHint"></span></p></td></tr>';
 }
 function renderAll(){ if(!S) return;
   paintBar(); renderRows(); renderTiles(); renderDays(); renderWeek();
