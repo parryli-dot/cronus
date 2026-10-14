@@ -2695,8 +2695,8 @@ function admLock(b){
 }
 
 /* ---- people ---- */
-// the PACMAN role -> Cronus role mapping the nightly sync applies (02_provision_from_pacman)
-function pacmanMaps(r){ return ({System_Admin:'admin',Finance:'admin',Sales_Admin:'project_manager',Sales_Admin_TH:'project_manager',PM:'project_manager'})[r]||'member'; }
+// the PACMAN role -> Cronus role mapping the nightly sync applies (02_provision_from_pacman; 112_: sync never grants admin, admins are set by hand)
+function pacmanMaps(r){ return ({Sales_Admin:'project_manager',Sales_Admin_TH:'project_manager',PM:'project_manager'})[r]||'member'; }
 let peopleFilter='pilot', peopleQ='';
 function admPeople(b){
   if(!STAFF) { b.innerHTML='<div class="card2">Loading…</div>'; return; }
@@ -2733,7 +2733,7 @@ function admPeople(b){
        '<td class="n">'+(u.logged_min?hm(u.logged_min):'—')+'</td>'+
        '<td><button class="sv2">Save</button></td></tr>';
    }).join('')+'</tbody></table></div>'+
-   '<p class="note">Cronus roles come from the PACMAN role: System_Admin and Finance \u2192 Admin; Sales_Admin, Sales_Admin_TH and PM \u2192 Project manager; everything else \u2192 Member. '+
+   '<p class="note">Cronus roles come from the PACMAN role: Sales_Admin, Sales_Admin_TH and PM \u2192 Project manager; everything else \u2192 Member, including System_Admin and Finance. The sync never makes anyone Admin \u2014 set Admin here by hand. '+
    'People with no PACMAN row get Member as a fallback. Changing a role here sets <code>role_locked</code>, so the next PACMAN sync will not overwrite it \u2014 those rows are under \u201cRole changed by hand\u201d. '+
    'The role decides which screens a person sees; who they can see is <code>manager_scope</code>, derived from PACMAN page ownership. Rates write to the audit trail and are effective from today.</p>';
 
