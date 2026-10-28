@@ -158,6 +158,7 @@
   .pvcap.warn { color:var(--unbooked-deep); background:var(--unbooked-soft); }
   .r1 { font-size:14px; font-weight:550; }
   .r2 { font-size:12.5px; color:var(--muted); margin-top:1px; }
+  .r3 { font-size:12px; color:var(--muted); margin-top:1px; }
   .why { font-size:11.5px; padding:3px 8px; border-radius:999px; background:var(--booked-soft); color:var(--booked);
     font-weight:600; white-space:nowrap; }
   .why.crew { background:var(--unbooked-soft); color:var(--unbooked-deep); }
@@ -182,6 +183,7 @@
   .iohits .hit:hover { background:var(--wash); }
   .iohits .hit .m { color:var(--muted); font-size:12px; white-space:nowrap; }
   .iohits .hit .m.live { color:var(--booked); font-weight:600; }
+  .iohits .hit .nt { display:block; color:var(--muted); font-size:12px; }
   .iopick { font-size:12.5px; color:var(--ink-2); margin-top:4px; }
   .iopick b { font-family:var(--mono); }
   .why.manual { background:var(--wash); color:var(--ink-2); }
@@ -817,7 +819,7 @@ const isNarrow = () => matchMedia('(max-width: 900px)').matches;
 
 let S=null, TASK={}, ENTRIES=[];
 let selDate, selTask=null, selStage=null, weekMon, calMon, openEdit=null, dTab='mine', pendingBig=null, sheetBig={key:null,at:0};
-let searchRows=[], searchTimer=null, tmpSeq=0, drag=null;
+let searchRows=[], searchQ='', searchTimer=null, tmpSeq=0, drag=null;
 
 function toast(msg,bad){ const t=$('#toast'); t.textContent=msg; t.className='toast show'+(bad?' err':'');
   clearTimeout(t._x); t._x=setTimeout(function(){ t.className='toast'; },bad?5000:3200); }
@@ -1231,7 +1233,7 @@ function renderRows(){
     if(q.length<2){ $('#rows').innerHTML='<div class="empty">Type at least two characters to search every deliverable in PACMAN.</div>'; return; }
     set=searchRows.map(function(r){ return {task_id:r.task_id,project_id:r.project_id,name:r.deliverable,
       client:r.client,io:r.io_number,page:r.page_abbr,booked:r.booked,roles:[],_remote:true,
-      why:r.booking_status||'PACMAN'}; });
+      why:r.booking_status||'PACMAN',note:r.note_hit===true?searchQ:''}; });
   } else {
     const base = dTab==='mine' ? S.deliverables.filter(function(d){return d.live;})
                                  .slice().sort(function(a,b){ return (FAVS[b.task_id]?1:0)-(FAVS[a.task_id]?1:0); })
@@ -1245,7 +1247,8 @@ function renderRows(){
     return '<div class="row '+(d.task_id===selTask?'cur':'')+'" data-id="'+d.task_id+'">'+
       pgChip(d.page)+
       '<div><div class="r1">'+esc(d.name)+(d.kind?'<span class="kd">'+esc(KIND_LAB[d.kind]||d.kind)+'</span>':'')+'</div><div class="r2">'+esc(d.client||'internal')+
-      (d.io?' · <span class="iocopy">'+esc(d.io)+'</span>'+(d.io_created?' · '+esc(d.io_created):''):'')+(d.booked?'':' · <b style="color:var(--unbooked)">unbooked</b>')+'</div></div>'+
+      (d.io?' · <span class="iocopy">'+esc(d.io)+'</span>'+(d.io_created?' · '+esc(d.io_created):''):'')+(d.booked?'':' · <b style="color:var(--unbooked)">unbooked</b>')+'</div>'+
+      (d.note?'<div class="r3">Contract note mentions: '+esc(d.note)+'</div>':'')+'</div>'+
       '<span class="why '+cls+'">'+esc(why)+'</span>'+
       '<button class="star '+(FAVS[d.task_id]?'on':'')+'" data-fav="'+d.task_id+'" title="Favourite">'+
       (FAVS[d.task_id]?'&#9733;':'&#9734;')+'</button></div>';
@@ -1253,7 +1256,7 @@ function renderRows(){
   $$('#rows .star').forEach(function(b){ b.onclick=function(ev){ ev.stopPropagation(); toggleFav(b.dataset.fav); }; });
   $$('#rows .row').forEach(function(el){ el.onclick=function(){
     const id=el.dataset.id;
-    if(!TASK[id]){ const f=set.filter(function(x){return x.task_id===id;})[0]; TASK[id]=f; TASK[id].suggest=null; }
+    if(!TASK[id]){ const f=set.filter(function(x){return x.task_id===id;})[0]; TASK[id]=Object.assign({},f,{note:''}); TASK[id].suggest=null; }
     selTask=id; selStage=null; pendingBig=null;
     if(!TASK[id].suggest && TASK[id].booked) fetchSuggest(id);
     renderRows(); paintBar(); $('#tEnd').focus();
@@ -1268,7 +1271,7 @@ $('#dsearch').oninput=function(){
     const q=$('#dsearch').value.trim(); if(q.length<2) return renderRows();
     const r=await sb.rpc('search_tasks',{q:q,lim:40});
     if(r.error){ toast(r.error.message,true); return; }
-    searchRows=r.data||[]; renderRows();
+    searchRows=r.data||[]; searchQ=q; renderRows();
   },160);
 };
 
@@ -1309,7 +1312,8 @@ $('#mIOq').oninput=function(){
     const hits=r.data||[];
     box.innerHTML = hits.length ? hits.map(function(h){
       return '<div class="hit" data-pid="'+h.project_id+'" data-io="'+esc(h.io)+'" data-lab="'+esc([h.io,h.brand||h.client].filter(Boolean).join(' — '))+'">'+
-        '<span><b style="font-family:var(--mono)">'+esc(h.io)+'</b> '+esc(h.brand||h.client||'')+'</span>'+
+        '<span><b style="font-family:var(--mono)">'+esc(h.io)+'</b> '+esc(h.brand||h.client||'')+
+        (h.note_hit===true?'<span class="nt">Contract note mentions: '+esc(q)+'</span>':'')+'</span>'+
         '<span class="m'+(h.live?' live':'')+'">'+(h.live?'live':'closed')+(h.io_created?' · '+esc(h.io_created):'')+'</span></div>'; }).join('')
       : '<div class="hit"><span class="m">No booking matches.</span></div>';
     box.style.display='';
