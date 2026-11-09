@@ -1294,9 +1294,11 @@ function revealNew(taskId){
 }
 function buildTargets(){
   const t=S.targets||[];
-  $('#mTarget').innerHTML=t.map(function(x){
+  // no default: an untouched list used to file the item under the first booking (Adrian 11-06 #17)
+  $('#mTarget').innerHTML='<option value="" data-kind="" selected>— Pick where this goes —</option>'+t.map(function(x){
     return '<option value="'+x.project_id+'" data-kind="'+x.kind+'">'+esc(x.label)+'</option>'; }).join('');
   $('#mNote').innerHTML = 'Anyone can add work under a booking: retainer posts, tech tasks, bonus items. It shows on the sales admin\u2019s Jobs page and counts as <b>unbooked</b> effort in margin.';
+  $('#mIOpick').style.display='none';
   syncKindUI();
 }
 const KIND_LAB={retainer:'Retainer post',tech:'Tech task',bonus:'Bonus item',other:'Extra',pitching:'Pitching',event:'Event'};
@@ -1309,7 +1311,8 @@ function syncKindUI(){
   $('#mNameLab').textContent = tech?'Tech task':(booking&&$('#mKind').value==='retainer'?'Post (first words) + date':'What is it?');
   $('#mName').placeholder = booking ? ($('#mKind').value==='retainer'?'e.g. 09-03 手造西餅':$('#mKind').value==='bonus'?'e.g. Bonus item: extra IG story':'e.g. Client briefing call') : (k==='pitching'?'e.g. Deck Creation':k==='event'?'e.g. Venue recce':'e.g. Q3 planning workshop');
 }
-$('#mTarget').onchange=syncKindUI; $('#mKind').onchange=syncKindUI;
+$('#mTarget').onchange=function(){ $('#mIOpick').style.display='none'; syncKindUI(); };   // a stale "Adding under X" after picking another target misleads (same class as #17)
+$('#mKind').onchange=syncKindUI;
 let ioTimer=null;
 $('#mIOq').oninput=function(){
   clearTimeout(ioTimer); const q=$('#mIOq').value.trim(); const box=$('#mIOhits');
@@ -1366,7 +1369,7 @@ $('#ncMake').onclick=async function(){
   const d=r.data, sel=$('#mTarget');
   let opt=sel.querySelector('option[value="'+d.project_id+'"]');
   if(!opt){ opt=document.createElement('option'); opt.value=d.project_id; opt.dataset.kind=k; opt.textContent=(d.code?d.code+' · ':'')+d.name; sel.appendChild(opt); }
-  sel.value=d.project_id; syncKindUI();
+  sel.value=d.project_id; $('#mIOpick').style.display='none'; syncKindUI();
   $('#ncForm').style.display='none'; $('#ncPreview').style.display='none';
   ['#ncCamp','#ncBrand','#ncSales','#ncPM'].forEach(function(id){ $(id).value=''; });
   if(k==='pitching'){
@@ -1393,7 +1396,11 @@ $('#mMake').onclick=async function(){
   const pid=$('#mTarget').value, k=targetKind(), booking=k==='booking';
   const kind = booking ? $('#mKind').value : null;
   const nm = (booking && kind==='tech') ? $('#mTech').value : $('#mName').value.trim();
-  if(!pid) return toast('Nothing to attach it to',true);
+  if($('#mIOq').value.trim()){   // clicking Create closed the results list; open it again so the hint can be followed
+    if($('#mIOhits').innerHTML.trim()) setTimeout(function(){ $('#mIOhits').style.display=''; },0);   // after the document click handler hides it
+    return toast('Click the booking in the search results first (or clear the search box)',true);
+  }
+  if(!pid) return toast('Pick where this goes first — from the list, or search an IO and click it',true);
   if(!nm) return toast('Give it a name',true);
   const r=await sb.rpc('create_manual_item',{p_project:pid,p_name:nm,p_kind:kind});
   if(r.error) return toast(friendly(r.error),true);
@@ -1941,6 +1948,7 @@ function renderWeek(){
   $$('#wbody .cell').forEach(function(inp){
     inp.onfocus=function(){ inp.select(); };
     inp.onchange=async function(){
+      $('#wkSaved').textContent='';   // a stale "saved" next to a rejected cell reads as success (Adrian 11-06 #14)
       const v=inp.value.trim(), m=v===''?0:weekMins(v);
       if(m===null){ toast('Try 1.5, 90m or 1:30',true); inp.value=inp.defaultValue; return; }   // nothing saved: show what is stored
       const t=TASK[inp.dataset.task];
