@@ -1114,11 +1114,12 @@ const stageName = id => { const s=stageById(id); return s?s.name:null; };
 const effStage = () => selStage!==null ? selStage : (selTask&&TASK[selTask] ? (TASK[selTask].suggest||null) : null);
 const stageRequired = () => selTask && TASK[selTask] && TASK[selTask].booked;
 
-function openStageMenu(anchor,current,onPick){
+function openStageMenu(anchor,current,onPick,taskId){   // taskId: the item this stage is for (defaults to the Log screen's item)
   const m=$('#menu');
   const seq=S.stages.filter(function(s){return s.kind==='sequence';});
   const oth=S.stages.filter(function(s){return s.kind!=='sequence';});
-  const sug=selTask&&TASK[selTask]?TASK[selTask].suggest:null;
+  const tid=taskId===undefined?selTask:taskId;
+  const sug=tid&&TASK[tid]?TASK[tid].suggest:null;
   const row=function(s){ return '<button data-s="'+s.id+'">'+esc(s.name)+
     (s.id===sug?' <span class="x" style="color:var(--muted);font-size:11px">suggested</span>':'')+
     (s.id===current?'<span class="tick">&#10003;</span>':'')+'</button>'; };
@@ -1582,7 +1583,7 @@ function renderDays(){
   }; });
   $$('#days .tagchip.miss').forEach(function(b){ b.onclick=function(){
     const e=ENTRIES.filter(function(x){return String(x.id)===b.dataset.stage;})[0];
-    openStageMenu(b,e.stage,function(s){ patchEntry(e,{stage:s}); }); }; });
+    openStageMenu(b,e.stage,function(s){ patchEntry(e,{stage:s}); },e.task_id); }; });
   if(openEdit) wireSheet(); else { sheetBig.open=null; sheetBig.key=null; }   // a closed panel forgets its pending confirm
 }
 function entryHTML(e){
@@ -1895,11 +1896,12 @@ function openCalPick(g,date,a,b){
 }
 async function pickCalTask(id){
   const p=calPick, t=TASK[id]; if(!p||!t) return;
+  p.pick=id;   // the last click wins if an earlier pick is still loading its stage
   let stage = (id===selTask && selStage!==null) ? selStage : (t.suggest||null);   // read only: the Log screen and a running timer keep their own item
   if(t.booked && !stage){ await fetchSuggest(id); stage=t.suggest||null; }
-  if(calPick!==p) return;   // closed while the stage suggestion loaded
+  if(calPick!==p||p.pick!==id) return;   // closed, or another item picked, while the stage suggestion loaded
   if(t.booked && !stage){   // booked work needs a stage: ask for it right here
-    openStageMenu(p.g, null, function(sid){ if(calPick!==p) return; finishCalPick(p,id,sid); });
+    openStageMenu(p.g, null, function(sid){ if(calPick!==p) return; finishCalPick(p,id,sid); }, id);
     return;
   }
   finishCalPick(p,id,stage);
@@ -1910,7 +1912,7 @@ async function finishCalPick(p,id,stage){
               mins:p.b-p.a,start:t2s(p.a),end:t2s(p.b),stage:stage,note:'',source:'manual',locked:false,_p:true };
   ENTRIES.push(row); renderAll();
   const saved=await insertEntry(row);
-  if(saved){ Object.assign(row,saved); delete row._p; toast(hm(row.mins)+' logged on '+fmt(p.date)); }
+  if(saved){ Object.assign(row,saved); delete row._p; toast(hm(row.mins)+' logged on '+fmt(p.date)+(stageName(stage)?' · '+stageName(stage):'')); }
   else ENTRIES=ENTRIES.filter(function(e){return e!==row;});
   renderAll();
 }
@@ -2088,7 +2090,7 @@ $$('.dtab').forEach(function(b){ b.onclick=function(){
   $('#dsearch').placeholder = dTab==='all'?'Search all bookings...':dTab==='recent'?'Filter recent...':'Filter your deliverables...';
   renderRows(); if(dTab==='all') $('#dsearch').focus(); }; });
 document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'&&calPick){ cancelCalPick(); return; }
+  if(e.key==='Escape'&&calPick&&!e.isComposing&&e.keyCode!==229){ cancelCalPick(); return; }
   if(e.target.matches('input,select,textarea')||!S) return;
   if(!$('#p-log').classList.contains('on')) return;
   if(e.key==='ArrowLeft'){ selDate=shift(selDate,-1); resetTimes(); renderAll(); }
