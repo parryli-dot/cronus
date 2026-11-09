@@ -426,6 +426,12 @@
   .menu .hd { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
     font-weight:650; padding:7px 9px 4px; }
   .menu .tick { color:var(--booked); font-weight:700; margin-left:auto; }
+  .menu input.mf { width:100%; box-sizing:border-box; margin:2px 0 4px; padding:6px 9px; border:1px solid var(--ring);
+    border-radius:7px; font-size:13px; }
+  .menu button.cur { background:var(--wash); }
+  .menu .mt { display:block; min-width:0; }
+  .menu .ms { display:block; font-size:12px; color:var(--muted); }
+  .menu .mnote { font-size:12px; color:var(--muted); padding:6px 9px 2px; }
   .panel { display:none; } .panel.on { display:block; }
 
   /* ---------- jobs (sales admin view) ---------- */
@@ -633,7 +639,7 @@
           <button id="cPrev">&lsaquo;</button><span class="lab" id="cLab">&mdash;</span><button id="cNext">&rsaquo;</button>
         </div>
         <button class="quick" id="cToday">Today</button>
-        <span class="calhint" id="calSel">Pick a deliverable first &mdash; drag then fills it in.</span>
+        <span class="calhint" id="calSel">Drag on the grid, then pick what it was for.</span>
       </div>
       <div class="calwrap">
         <div class="calhead" id="calHead"></div>
@@ -827,6 +833,7 @@ const isNarrow = () => matchMedia('(max-width: 900px)').matches;
 
 let S=null, TASK={}, ENTRIES=[];
 let selDate, selTask=null, selStage=null, weekMon, calMon, openEdit=null, dTab='mine', pendingBig=null, sheetBig={key:null,at:0};
+let calPick=null;   // {g,date,a,b} while the calendar's "what was this for?" picker is open
 let searchRows=[], searchQ='', searchTimer=null, tmpSeq=0, drag=null;
 
 function toast(msg,bad){ const t=$('#toast'); t.textContent=msg; t.className='toast show'+(bad?' err':'');
@@ -1000,7 +1007,7 @@ function applyBoot(d){
   ENTRIES = S.entries.map(function(e){ e.mins=+e.mins; return e; });
   S.isSalesAdmin = !!d.is_sales_admin;
   selDate=S.today; weekMon=monday(S.today); calMon=monday(S.today);
-  selTask=null; selStage=null; openEdit=null; pendingBig=null; REP=null; JOBS=null; jobsOpen=null; sheetBig.key=null; repBig.key=null;
+  selTask=null; selStage=null; openEdit=null; pendingBig=null; cancelCalPick(); REP=null; JOBS=null; jobsOpen=null; sheetBig.key=null; repBig.key=null;
   $('#whoami').textContent = S.me.name+' · '+S.me.role.replace('_',' ')+(VIEW_AS?' · preview':'');
   buildTargets(); fillRepFilters();
 }
@@ -1124,8 +1131,9 @@ function openStageMenu(anchor,current,onPick){
     ev.stopPropagation(); m.classList.remove('on'); onPick(b.dataset.s); }; });
 }
 document.addEventListener('click',function(e){
-  if(!e.target.closest('#menu')&&!e.target.closest('.chip.stage')&&!e.target.closest('.tagchip.miss'))
-    $('#menu').classList.remove('on');
+  if(calPick && e.target.closest('#calGrid')) return;   // the click that ends a calendar drag; a new press on the grid cancels instead
+  if(!e.target.closest('#menu')&&!e.target.closest('.chip.stage')&&!e.target.closest('.tagchip.miss')){
+    $('#menu').classList.remove('on'); cancelCalPick(); }
 });
 
 /* ---------- entry bar ---------- */
@@ -1174,7 +1182,7 @@ function paintBar(){
     (typed!==t2s(tt.b) ? ' · ends '+t2s(tt.b)+(next?' +1':'') : (next?' · ends next day':'')));
   $('#addBtn').disabled = $('#addBtn').classList.contains('done') || !(selTask && mins>0 && !(stageRequired()&&!sid));
   $('#addBtn').title = !selTask ? 'Pick a deliverable first' : (stageRequired()&&!sid) ? 'Booked work needs a stage — click the Stage chip' : !(mins>0) ? 'Fill in the times' : '';
-  $('#calSel').textContent = selTask ? ('Dragging will log: '+TASK[selTask].name) : 'Pick a deliverable first — drag then fills it in.';
+  $('#calSel').textContent = 'Drag on the grid, then pick what it was for.';
   paintGuard(mins,tt.a);
 }
 function paintGuard(mins,a){
@@ -1747,6 +1755,7 @@ function renderCal(){
       hours.map(function(){ return '<div class="hr"></div>'; }).join('')+'</div>';
   });
   grid.innerHTML=html;
+  if(calPick){ const pc=grid.querySelector('.daycol[data-date="'+calPick.date+'"]'); if(pc) pc.appendChild(calPick.g); else cancelCalPick(); }   // a redraw (resize, another save) keeps the open picker's block
 
   days.forEach(function(d){
     const col=grid.querySelector('.daycol[data-date="'+d+'"]');
@@ -1803,10 +1812,10 @@ function wireCalDrag(){
   const grid=$('#calGrid');
   grid.querySelectorAll('.daycol').forEach(function(col){
     col.onpointerdown=function(ev){
+      if(calPick){ cancelCalPick(); return; }   // picker open: a press elsewhere on the grid just closes it
       const blk=ev.target.closest('.blk');
       if(blk){ startBlockDrag(ev,blk,col,ev.target.classList.contains('rz')); return; }
       if(col.dataset.date > S.today){ toast('No logging into the future',true); return; }
-      if(!selTask){ toast('Pick a deliverable on the Log screen first',true); return; }
       ev.preventDefault(); col.setPointerCapture(ev.pointerId);
       const a=yToMin(col,ev.clientY);
       const g=document.createElement('div'); g.className='ghost'; col.appendChild(g);
@@ -1830,18 +1839,9 @@ function wireCalDrag(){
     if(!drag) return;
     const d=drag; drag=null;
     if(d.mode==='new'){
-      d.g.remove();
       const a=Math.min(d.a,d.b), b=Math.max(d.a,d.b);
-      if(b-a < SNAP) { renderCal(); return; }
-      const date=d.col.dataset.date;
-      if(stageRequired()&&!effStage()){ toast('This is booked work — it needs a stage',true); renderCal(); return; }
-      const row={ id:tempId(),task_id:selTask,project_id:TASK[selTask].project_id,date:date,
-                  mins:b-a,start:t2s(a),end:t2s(b),stage:effStage(),note:'',source:'manual',locked:false,_p:true };
-      ENTRIES.push(row); renderAll();
-      const saved=await insertEntry(row);
-      if(saved){ Object.assign(row,saved); delete row._p; toast(hm(row.mins)+' logged on '+fmt(date)); }
-      else ENTRIES=ENTRIES.filter(function(e){return e!==row;});
-      renderAll();
+      if(b-a < SNAP) { d.g.remove(); renderCal(); return; }
+      openCalPick(d.g, d.col.dataset.date, a, b);   // the ghost stays on the grid until a deliverable is picked
     } else {
       const e=d.e, a=Math.min(d.a,d.b), b=Math.max(d.a,d.b);
       if(e.start===t2s(a)&&e.end===t2s(b)){ renderCal(); return; }
@@ -1856,6 +1856,66 @@ function paintGhost(){
   drag.g.style.height=Math.max(2,(b-a)/60*HH)+'px';
   drag.g.textContent=t2s(a)+'–'+t2s(b)+' · '+hm(b-a);
 }
+/* Calendar: drag first, then pick what the block was for — no trip to the Log screen (Adrian 11-06, opinion 2) */
+function calPickTasks(){
+  const ids=[], add=function(id){ if(id&&TASK[id]&&ids.indexOf(id)<0) ids.push(id); };
+  add(selTask);
+  Object.keys(FAVS).forEach(add);
+  recentTasks().forEach(add);
+  S.deliverables.filter(function(d){return d.live;}).forEach(function(d){ add(d.task_id); });
+  return ids;
+}
+function openCalPick(g,date,a,b){
+  calPick={g:g,date:date,a:a,b:b};
+  const m=$('#menu');
+  m.innerHTML='<div class="hd">Log '+t2s(a)+'–'+t2s(b)+' · '+esc(fmt(date))+'</div>'+
+    '<input class="mf" id="calPickQ" placeholder="Filter deliverables..." autocomplete="off">'+
+    '<div id="calPickList"></div>'+
+    '<div class="mnote">Not listed? Use Search all bookings on the Log screen.</div>';
+  const paint=function(){
+    const q=$('#calPickQ').value.trim().toLowerCase();
+    const ids=calPickTasks().filter(function(id){ const t=TASK[id];
+      return !q || (t.name+' '+(t.client||'')+' '+(t.io||'')).toLowerCase().indexOf(q)>=0; }).slice(0,30);
+    $('#calPickList').innerHTML = ids.length ? ids.map(function(id){ const t=TASK[id];
+      return '<button data-t="'+esc(id)+'" class="'+(id===selTask?'cur':'')+'"><span class="mt">'+esc(t.name)+
+        '<span class="ms">'+esc(t.client||'internal')+(t.io?' · '+esc(t.io):'')+(t.booked?'':' · unbooked')+'</span></span>'+
+        (FAVS[id]?'<span class="tick">&#9733;</span>':'')+'</button>'; }).join('')
+      : '<div class="mnote">Nothing matches.</div>';
+    $$('#calPickList button').forEach(function(btn){ btn.onclick=function(ev){ ev.stopPropagation(); pickCalTask(btn.dataset.t); }; });
+  };
+  paint();
+  $('#calPickQ').oninput=paint;
+  $('#calPickQ').onkeydown=function(e){ if(enterKey(e)){ const f=$('#calPickList button'); if(f) f.click(); } };
+  m.classList.add('on');
+  const r=g.getBoundingClientRect();
+  let top=r.bottom+6; if(top+m.offsetHeight>innerHeight-8) top=Math.max(8, r.top-m.offsetHeight-6);
+  m.style.left=Math.max(8,Math.min(r.left, innerWidth-m.offsetWidth-14))+'px';
+  m.style.top=(top+scrollY)+'px';
+  $('#calPickQ').focus();
+}
+async function pickCalTask(id){
+  const p=calPick, t=TASK[id]; if(!p||!t) return;
+  let stage = (id===selTask && selStage!==null) ? selStage : (t.suggest||null);   // read only: the Log screen and a running timer keep their own item
+  if(t.booked && !stage){ await fetchSuggest(id); stage=t.suggest||null; }
+  if(calPick!==p) return;   // closed while the stage suggestion loaded
+  if(t.booked && !stage){   // booked work needs a stage: ask for it right here
+    openStageMenu(p.g, null, function(sid){ if(calPick!==p) return; finishCalPick(p,id,sid); });
+    return;
+  }
+  finishCalPick(p,id,stage);
+}
+async function finishCalPick(p,id,stage){
+  calPick=null; $('#menu').classList.remove('on'); p.g.remove();
+  const row={ id:tempId(),task_id:id,project_id:TASK[id].project_id,date:p.date,
+              mins:p.b-p.a,start:t2s(p.a),end:t2s(p.b),stage:stage,note:'',source:'manual',locked:false,_p:true };
+  ENTRIES.push(row); renderAll();
+  const saved=await insertEntry(row);
+  if(saved){ Object.assign(row,saved); delete row._p; toast(hm(row.mins)+' logged on '+fmt(p.date)); }
+  else ENTRIES=ENTRIES.filter(function(e){return e!==row;});
+  renderAll();
+}
+function enterKey(e){ return e.key==='Enter' && !e.isComposing && e.keyCode!==229; }   // Enter that isn't confirming a Chinese IME word
+function cancelCalPick(){ if(!calPick) return; const p=calPick; calPick=null; $('#menu').classList.remove('on'); p.g.remove(); }
 function startBlockDrag(ev,blk,col,resize){
   const e=ENTRIES.filter(function(x){return String(x.id)===blk.dataset.id;})[0];
   if(!e||e.locked) return;
@@ -2018,9 +2078,9 @@ document.addEventListener('focusin',function(e){
   setTimeout(function(){ el._selOnce=false; },400);
 });
 document.addEventListener('mouseup',function(e){ const el=e.target; if(el && el._selOnce){ el._selOnce=false; e.preventDefault(); } });
-$('#tStart').onkeydown=function(e){ if(e.key==='Enter'){ $('#tEnd').focus(); } };
-$('#tEnd').onkeydown=function(e){ if(e.key==='Enter') tryAdd(); };
-$('#desc').onkeydown=function(e){ if(e.key==='Enter') tryAdd(); };
+$('#tStart').onkeydown=function(e){ if(enterKey(e)){ $('#tEnd').focus(); } };
+$('#tEnd').onkeydown=function(e){ if(enterKey(e)) tryAdd(); };
+$('#desc').onkeydown=function(e){ if(enterKey(e)) tryAdd(); };
 $('#addBtn').onclick=tryAdd;
 $$('.dtab').forEach(function(b){ b.onclick=function(){
   $$('.dtab').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); dTab=b.dataset.d;
@@ -2028,6 +2088,7 @@ $$('.dtab').forEach(function(b){ b.onclick=function(){
   $('#dsearch').placeholder = dTab==='all'?'Search all bookings...':dTab==='recent'?'Filter recent...':'Filter your deliverables...';
   renderRows(); if(dTab==='all') $('#dsearch').focus(); }; });
 document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&calPick){ cancelCalPick(); return; }
   if(e.target.matches('input,select,textarea')||!S) return;
   if(!$('#p-log').classList.contains('on')) return;
   if(e.key==='ArrowLeft'){ selDate=shift(selDate,-1); resetTimes(); renderAll(); }
@@ -2226,7 +2287,7 @@ function renderCamps(){
   $$('#campBody [data-addbtn]').forEach(function(b){ b.onclick=function(){ const v=$('#campBody input[data-addio="'+b.dataset.addbtn+'"]').value.trim(); if(!v) return toast('Type the IO number',true); act('event_io_set',{p_project:b.dataset.addbtn,p_io:v,p_on:true},'IO added to the event'); }; });
   $$('#campBody [data-rmio]').forEach(function(a){ a.onclick=function(e){ e.preventDefault(); act('event_io_set',{p_project:a.dataset.p,p_io:a.dataset.rmio,p_on:false},'IO removed'); }; });
   $$('#campBody [data-arch]').forEach(function(b){ b.onclick=function(){ act('campaign_archive',{p_project:b.dataset.arch,p_archived:b.dataset.to==='1'},b.dataset.to==='1'?'Archived \u2014 find it again under Show \u2192 Including archived':'Restored'); }; });
-  $$('#campBody input').forEach(function(i){ i.onkeydown=function(e){ if(e.key==='Enter'){ const btn=i.parentElement.querySelector('button'); if(btn) btn.click(); } }; });
+  $$('#campBody input').forEach(function(i){ i.onkeydown=function(e){ if(enterKey(e)){ const btn=i.parentElement.querySelector('button'); if(btn) btn.click(); } }; });
 }
 $('#campRun').onclick=loadCamps; $('#campArch').onchange=loadCamps; $('#campQ').oninput=renderCamps;
 $('#jLive').onchange=renderJobs;
