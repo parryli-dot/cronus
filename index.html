@@ -990,12 +990,12 @@ async function startSession(){
   const sa = await sb.rpc('app_is_sales_admin');
   d.is_sales_admin = !sa.error && sa.data === true;
   applyBoot(d);
+  await loadFavs();   // stars in before the screen shows: no star clicked against an empty list
   REAL_ME = S.me; VIEW_AS=null;
   $('#gate').style.display='none'; $('#shell').classList.add('on');
   // Sales admins watch hours rather than log them: give them the Jobs view and land there.
   applyChrome(roleFor(S), {log:S.me.tracks_time});
   setupPreviewTools();
-  await loadFavs();
   renderAll();
   restoreTimer();
   resetTimes(); paintBar();   // here, not after start(): the SIGNED_IN and back-button paths need it too
@@ -1007,7 +1007,8 @@ function applyBoot(d){
   ENTRIES = S.entries.map(function(e){ e.mins=+e.mins; return e; });
   S.isSalesAdmin = !!d.is_sales_admin;
   selDate=S.today; weekMon=monday(S.today); calMon=monday(S.today);
-  selTask=null; selStage=null; openEdit=null; pendingBig=null; cancelCalPick(); REP=null; JOBS=null; jobsOpen=null; sheetBig.key=null; repBig.key=null;
+  selTask=null; selStage=null; openEdit=null; pendingBig=null; cancelCalPick(); REP=null; JOBS=null; jobsOpen=null; JOBX={}; CAMPS=null; sheetBig.key=null; repBig.key=null;
+  for(const k in REQ) REQ[k]++;   // answers still on the way belong to the previous identity
   $('#whoami').textContent = S.me.name+' · '+S.me.role.replace('_',' ')+(VIEW_AS?' · preview':'');
   buildTargets(); fillRepFilters();
 }
@@ -1034,7 +1035,7 @@ function goPanel(k){
   $$('.rail a').forEach(function(x){x.classList.toggle('on', x.dataset.go===k);});
   $$('.panel').forEach(function(p){p.classList.remove('on');});
   $('#p-'+k).classList.add('on');
-  if(k==='jobs') loadJobs();
+  if(k==='jobs'){ loadJobs(); if(jView==='camp'&&!CAMPS) loadCamps(); }
   if(k==='dash') runDash();
   if(k==='rep'){ if(!REP) runReport(); else renderReport(); }
   if(k==='week') renderWeek();
@@ -1045,7 +1046,7 @@ function goPanel(k){
    Same idea as Atrium: a role switcher shows the layout each role gets; "View as" loads a real
    person's deliverables and hours read-only (bootstrap_as, admin-only on the server).
    Available to every admin: previewing what a colleague sees is part of the admin job.     */
-let REAL_ME=null, VIEW_AS=null, ROLE_VIEW='admin', pvWired=false;
+let REAL_ME=null, VIEW_AS=null, ROLE_VIEW='admin', pvWired=false, VIEW_SEQ=0, VIEW_PEND=0;   // VIEW_PEND: seq of a View as still loading   // VIEW_SEQ: newest View as / Exit wins (applyBoot bumps REQ, so not kept there)
 // who the previewed person can see: themselves plus their manager_scope (Dashboard and Reports in preview use this, not just the person alone)
 function pvScope(){ if(S.me.is_admin||S.isSalesAdmin) return null; return [S.me.id].concat((S.team||[]).map(function(u){return u.id;})); }
 function pvPeople(){ return [{user_id:S.me.id,name:S.me.name}].concat((S.team||[]).map(function(u){return {user_id:u.id,name:u.name};})); }
@@ -1053,7 +1054,7 @@ function pvPeople(){ return [{user_id:S.me.id,name:S.me.name}].concat((S.team||[
 // Your own permissions never change client-side, so a preview that could still write would be a lie.
 function layoutPreview(){ return !!(REAL_ME && REAL_ME.is_admin && ROLE_VIEW && ROLE_VIEW !== 'admin'); }
 function guardRO(){
-  if(VIEW_AS){ toast('Preview is read only — exit the preview to make changes',true); return true; }
+  if(VIEW_AS || (REAL_ME&&S.me&&S.me.id!==REAL_ME.id)){ toast('Preview is read only — exit the preview to make changes',true); return true; }   // also while Exit preview is still loading your own data
   if(layoutPreview()){ toast('Layout preview is read only — switch back to your own layout to make changes',true); return true; }
   return false; }
 function setupPreviewTools(){
@@ -1074,7 +1075,10 @@ function pvCaption(html,warn){ const c=$('#pvcap'); if(!html){ c.style.display='
   const x=$('#pvExit'); if(x) x.onclick=function(){ exitPreview(); }; }
 function previewRole(role){
   if(VIEW_AS){ // role tabs describe the previewed person; switching role means leaving the person
-    exitPreview().then(function(){ previewRole(role); }); return; }
+    const p=exitPreview(), seq=VIEW_SEQ;   // exitPreview has bumped VIEW_SEQ by now
+    p.then(function(){ if(seq===VIEW_SEQ) previewRole(role); }); return; }   // another View as / Exit since: leave it alone
+  if(S.me.id!==REAL_ME.id && SELF_P){   // Exit still loading your data: its landing would reset the layout, so pick it after
+    const seq=VIEW_SEQ; SELF_P.then(function(){ if(seq===VIEW_SEQ) previewRole(role); }); return; }
   applyChrome(role);
   if(!layoutPreview()) pvCaption('');
   else if(role==='editor') pvCaption('&#128065; <b>Editor layout</b> &mdash; the menu and screens someone who logs time sees. Your own data and your own admin rights are unchanged, so this is <b>read only</b>; pick a person under <b>View as\u2026</b> to see their data.');
@@ -1083,9 +1087,20 @@ function previewRole(role){
 }
 async function setViewAs(uid){
   if(!uid){ exitPreview(); return; }
-  if(timer) { $('#viewAs').value=''; return toast('Stop your timer before previewing someone else',true); }
+  if(timer) { $('#viewAs').value=VIEW_AS?VIEW_AS.id:''; return toast('Stop your timer before previewing someone else',true); }
+  const seq=++VIEW_SEQ; VIEW_PEND=seq;
   const r=await sb.rpc('bootstrap_as',{p_user:uid,p_days:60});
-  if(r.error||!r.data||r.data.error){ $('#viewAs').value=''; return toast(friendly(r.error||{message:String(r.data&&r.data.error)}),true); }
+  if(seq!==VIEW_SEQ) return;   // picked someone else, or exited, while this loaded
+  VIEW_PEND=0;
+  const fail = r.error||!r.data||r.data.error ? friendly(r.error||{message:String(r.data&&r.data.error)})
+             : timer ? 'Stop your timer before previewing someone else' : null;   // a timer started while this loaded
+  if(fail){
+    toast(fail,true);
+    if(VIEW_AS){ $('#viewAs').value=VIEW_AS.id; return; }   // still previewing the previous person, as before
+    $('#viewAs').value='';
+    if(S.me.id!==REAL_ME.id) backToSelf();   // an Exit this retired left their data on screen: back to yours
+    return;
+  }
   const d=r.data; VIEW_AS={id:uid,name:d.me.name};
   // 睇人哋嘅資料本身係一件要記低嘅事，觸發器捉唔到，所以喺呢度寫一行
   sb.rpc('activity_note',{p_action:'preview_person',p_summary:'Looked at '+d.me.name+'\u2019s data with View as',p_object_kind:'user',p_object_id:uid});
@@ -1098,13 +1113,30 @@ async function setViewAs(uid){
   renderAll();
 }
 async function exitPreview(){
-  if(!VIEW_AS){ return; }
-  VIEW_AS=null; $('#viewAs').value='';
+  $('#viewAs').value='';
+  if(!VIEW_AS && S.me.id===REAL_ME.id){   // your own data is on screen already
+    if(VIEW_PEND && VIEW_PEND===VIEW_SEQ){ ++VIEW_SEQ; VIEW_PEND=0; }   // only a View as still loading: drop it
+    return;
+  }
+  VIEW_AS=null;
+  return backToSelf();   // also retires a View as or an earlier Exit still loading
+}
+let SELF_P=null;   // the Exit still loading, if any: a role tab picked meanwhile waits for it
+function backToSelf(){   // SELF_P is set only while loading: once done (landed, stale, or failed) it is cleared, so nothing waits on it forever
+  const seq=++VIEW_SEQ;
+  const p=loadSelf(seq).catch(function(e){ console.error(e); if(seq===VIEW_SEQ) location.reload(); })   // same as a failed bootstrap: start again from your own data
+    .finally(function(){ if(SELF_P===p) SELF_P=null; });
+  return SELF_P=p;
+}
+async function loadSelf(seq){   // back to your own data; until it lands guardRO keeps the screen read only
   const r=await sb.rpc('bootstrap',{p_days:60});
+  if(seq!==VIEW_SEQ) return;   // a newer View as / Exit owns the screen
   if(r.error||!r.data||r.data.error){ location.reload(); return; }
-  const sa = await sb.rpc('app_is_sales_admin'); r.data.is_sales_admin = !sa.error && sa.data===true;
-  applyBoot(r.data); REAL_ME=S.me;
-  await loadFavs();
+  const sa = await sb.rpc('app_is_sales_admin'); if(seq!==VIEW_SEQ) return;
+  r.data.is_sales_admin = !sa.error && sa.data===true;
+  const fv = await sb.from('favourites').select('task_id'); if(seq!==VIEW_SEQ) return;   // stars in before the screen turns writable: no star clicked against an empty list
+  applyBoot(r.data); FAVS={}; if(!fv.error) (fv.data||[]).forEach(function(x){ FAVS[x.task_id]=1; });
+  REAL_ME=S.me;
   applyChrome('admin'); pvCaption('');
   goPanel('log'); renderAll();
 }
@@ -1279,14 +1311,20 @@ function renderRows(){
     renderRows(); paintBar(); $('#tEnd').focus();
   }; });
 }
-async function fetchSuggest(id){ const r=await sb.rpc('suggest_stage',{p_task:id});
-  if(r.data){ TASK[id].suggest=r.data; if(selTask===id&&selStage===null) paintBar(); } }
+const REQ={};   // newest request per screen: a late answer to an older request is dropped, never painted over a newer one
+function reqTicket(k){ REQ[k]=(REQ[k]||0)+1; return REQ[k]; }
+function reqStale(k,t){ return REQ[k]!==t; }
+async function fetchSuggest(id){ const s0=S, r=await sb.rpc('suggest_stage',{p_task:id});
+  if(S!==s0) return;   // View as / Exit meanwhile: the suggestion was for the other person's task
+  if(r.data&&TASK[id]){ TASK[id].suggest=r.data; if(selTask===id&&selStage===null) paintBar(); } }
 $('#dsearch').oninput=function(){
+  const t=reqTicket('dsearch');   // any keystroke retires the answer still on its way
   if(dTab!=='all'){ renderRows(); return; }
   clearTimeout(searchTimer);
   searchTimer=setTimeout(async function(){
     const q=$('#dsearch').value.trim(); if(q.length<2) return renderRows();
     const r=await sb.rpc('search_tasks',{q:q,lim:40});
+    if(reqStale('dsearch',t)) return;
     if(r.error){ toast(r.error.message,true); return; }
     searchRows=r.data||[]; searchQ=q; renderRows();
   },160);
@@ -1325,9 +1363,11 @@ $('#mKind').onchange=syncKindUI;
 let ioTimer=null;
 $('#mIOq').oninput=function(){
   clearTimeout(ioTimer); const q=$('#mIOq').value.trim(); const box=$('#mIOhits');
+  const t=reqTicket('mIOq');
   if(q.length<2){ box.style.display='none'; return; }
   ioTimer=setTimeout(async function(){
     const r=await sb.rpc('search_bookings',{q:q,lim:12});
+    if(reqStale('mIOq',t)) return;
     if(r.error){ toast(friendly(r.error),true); return; }
     const hits=r.data||[];
     box.innerHTML = hits.length ? hits.map(function(h){
@@ -1338,6 +1378,7 @@ $('#mIOq').oninput=function(){
       : '<div class="hit"><span class="m">No booking matches.</span></div>';
     box.style.display='';
     $$('#mIOhits .hit[data-pid]').forEach(function(el){ el.onclick=function(){
+      clearTimeout(ioTimer); reqTicket('mIOq');   // a search still waiting or on the way must not reopen the list
       const sel=$('#mTarget'); let opt=sel.querySelector('option[value="'+el.dataset.pid+'"]');
       if(!opt){ opt=document.createElement('option'); opt.value=el.dataset.pid; opt.dataset.kind='booking'; opt.textContent=el.dataset.lab; sel.appendChild(opt); }
       sel.value=el.dataset.pid; box.style.display='none'; $('#mIOq').value='';
@@ -1367,20 +1408,24 @@ function ncSync(){
 }
 $('#ncToggle').onclick=function(){ const f=$('#ncForm'); const on=f.style.display==='none'; f.style.display=on?'':'none';
   $('#ncPreview').style.display=on?'':'none'; if(on){ ncSync(); $('#ncCamp').focus(); } };
+function ncFields(){ return ['#ncKind','#ncCamp','#ncBrand','#ncSales','#ncPM'].map(function(id){ return $(id).value; }).join('\u0001'); }
 $('#ncKind').onchange=ncSync; ['#ncCamp','#ncBrand','#ncSales','#ncPM'].forEach(function(id){ $(id).oninput=ncSync; });
 $('#ncMake').onclick=async function(){
   if(guardRO()) return;
   const k=$('#ncKind').value, n=ncName();
   if(k==='event' && !/^EVT?-?\d{6,9}$/.test(n.code)) return toast('Event code looks like EVT-20260702',true);
   if(!n.name) return toast(k==='event'?'Give the event a name':'Give the campaign a name',true);
+  const sel=$('#mTarget'), tgt0=sel.value, task0=selTask, typed0=ncFields(), s0=S;
   const r=await sb.rpc('create_campaign',{p_kind:k,p_name:n.name,p_brand:n.brand||null,p_code:n.code||null});
   if(r.error) return toast(friendly(r.error),true);
-  const d=r.data, sel=$('#mTarget');
+  if(S!==s0) return;   // View as / Exit meanwhile: not adding it to someone else's list
+  const d=r.data, moved=sel.value!==tgt0||selTask!==task0;   // the user picked something else while it was being created: leave their pick alone
   let opt=sel.querySelector('option[value="'+d.project_id+'"]');
   if(!opt){ opt=document.createElement('option'); opt.value=d.project_id; opt.dataset.kind=k; opt.textContent=(d.code?d.code+' · ':'')+d.name; sel.appendChild(opt); }
-  sel.value=d.project_id; $('#mIOpick').style.display='none'; syncKindUI();
-  $('#ncForm').style.display='none'; $('#ncPreview').style.display='none';
-  ['#ncCamp','#ncBrand','#ncSales','#ncPM'].forEach(function(id){ $(id).value=''; });
+  if(!moved){ sel.value=d.project_id; $('#mIOpick').style.display='none'; syncKindUI(); }
+  if(ncFields()===typed0){   // a second campaign typed in the meantime stays in the form
+    $('#ncForm').style.display='none'; $('#ncPreview').style.display='none';
+    ['#ncCamp','#ncBrand','#ncSales','#ncPM'].forEach(function(id){ $(id).value=''; }); }
   if(k==='pitching'){
     const lab=(d.code?d.code+' · ':'')+d.name;
     (d.task_list||[]).slice().reverse().forEach(function(x){
@@ -1388,11 +1433,11 @@ $('#ncMake').onclick=async function(){
         roles:['manual'], live:true, booked:false, internal:false, suggest:null };
       S.deliverables=S.deliverables.filter(function(y){return y.task_id!==x.task_id;}); S.deliverables.unshift(TASK[x.task_id]);
     });
-    const first=(d.task_list||[])[0]; if(first){ selTask=first.task_id; selStage=null; revealNew(first.task_id); } else renderAll();
-    toast(d.existing?'That campaign already existed — its tasks are in your list':'Campaign created — its 10 tasks are in your list, first one selected');
+    const first=(d.task_list||[])[0]; if(first&&!moved){ selTask=first.task_id; selStage=null; revealNew(first.task_id); } else renderAll();
+    toast(d.existing?'That campaign already existed — its tasks are in your list':'Campaign created — its 10 tasks are in your list'+(first&&!moved?', first one selected':''));
   } else {
-    toast(d.existing?'That event already existed — add work under it':'Event created — now add what you did under it');
-    $('#mName').focus();
+    toast(d.existing?'That event already existed — add work under it':'Event created — now add what you did under it'+(moved?' (pick it under “Where”)':''));
+    if(!moved) $('#mName').focus();
   }
 };
 $('#addToggle').onclick=function(){
@@ -1411,16 +1456,20 @@ $('#mMake').onclick=async function(){
   }
   if(!pid) return toast('Pick where this goes first — from the list, or search an IO and click it',true);
   if(!nm) return toast('Give it a name',true);
+  const lab=$('#mTarget').selectedOptions[0].textContent, task0=selTask, s0=S;   // read before waiting: the list may be changed meanwhile
   const r=await sb.rpc('create_manual_item',{p_project:pid,p_name:nm,p_kind:kind});
   if(r.error) return toast(friendly(r.error),true);
-  const d=r.data, opt=$('#mTarget').selectedOptions[0];
-  const lab=opt.textContent, ioM=booking?lab.match(/^(\S+)\s+—\s+(.*)$/):null;
+  if(S!==s0) return;   // View as / Exit meanwhile: not adding it to someone else's list
+  const d=r.data, ioM=booking?lab.match(/^(\S+)\s+—\s+(.*)$/):null;
   TASK[d.task_id]={ task_id:d.task_id, project_id:d.project_id, name:d.name,
     client:k==='internal'?null:(ioM?ioM[2]:lab), io:ioM?ioM[1]:null, page:null, kind:d.kind||null,
     roles:[k==='internal'?'internal':'manual'], live:true, booked:false, internal:k==='internal', suggest:null };
   S.deliverables=S.deliverables.filter(function(x){return x.task_id!==d.task_id;}); S.deliverables.unshift(TASK[d.task_id]);
+  const moved=selTask!==task0;   // the user picked another item while it was being created: keep their pick
+  if((booking&&kind==='tech'?$('#mTech').value:$('#mName').value.trim())===nm){ $('#mName').value=''; $('#mIOpick').style.display='none'; }
+  if($('#addForm').classList.contains('on')) $('#addToggle').click();   // a form closed in the meantime is not opened again
+  if(moved){ renderAll(); return toast(d.existing?'That already existed — it is at the top of your list':'Added to the top of your list'); }
   selTask=d.task_id; selStage=null;
-  $('#mName').value=''; $('#mIOpick').style.display='none'; $('#addToggle').click();
   revealNew(d.task_id);
   toast(d.existing?'That already existed — it is at the top of your list and selected':'Added to the top of your list and selected — now fill in the time and press Add');
 };
@@ -1467,24 +1516,34 @@ async function insertEntry(row){
 }
 function hkTime(iso){ const d=new Date(iso);
   return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Hong_Kong',hour:'2-digit',minute:'2-digit',hour12:false}).format(d); }
+const entSnap=e=>({date:e.date,mins:e.mins,start:e.start,end:e.end,stage:e.stage,note:e.note});
 async function patchEntry(e,patch){
   if(guardRO()) return false;
-  const before=JSON.parse(JSON.stringify(e));
+  if(!e._pend){ e._base=entSnap(e); e._baseT=0; e._lastErr=false; }   // last state the server has; overlapping edits roll back to it, never to each other
+  e._pend=(e._pend||0)+1;
   Object.assign(e,patch); renderAll();
+  const s0=S, t=reqTicket('ent'+e.id), sent=entSnap(e);
   const a=e.start?parseTime(e.start):null, b=e.end?parseTime(e.end):null;
-  const r=await sb.from('time_entries').update({
+  let r;
+  try{ r=await sb.from('time_entries').update({
     entry_date:e.date, duration_sec:e.mins*60,
     started_at:stamp(e.date,a), ended_at:endStamp(e.date,a,b),
     stage_tag_id:e.stage||null, description:e.note||null, edited_by:S.me.id
-  }).eq('id',e.id);
-  if(r.error){ Object.assign(e,before); renderAll(); toast(friendly(r.error),true); return false; }
-  return true;
+  }).eq('id',e.id); }
+  catch(err){ r={error:err}; }   // a thrown request is a failed save: same red toast and rollback, and _pend still counts down
+  e._pend--;
+  if(!r.error && t>e._baseT){ e._base=sent; e._baseT=t; }   // the newest edit that went through is what the server holds
+  if(!reqStale('ent'+e.id,t)) e._lastErr=!!r.error;      // what the screen shows is the newest edit: did it go through?
+  if(r.error) toast(friendly(r.error),true);
+  if(!e._pend && e._lastErr && S===s0){ e._lastErr=false; Object.assign(e,e._base); renderAll(); }   // all answers in: show what was saved
+  return !r.error;
 }
 async function removeEntry(e){
   if(guardRO()) return false;
   ENTRIES=ENTRIES.filter(function(x){return x.id!==e.id;}); renderAll();
+  const t=reqTicket('del'+e.id);   // applyBoot retires it: fresh data already has the entry
   const r=await sb.from('time_entries').delete().eq('id',e.id);
-  if(r.error){ ENTRIES.push(e); renderAll(); toast(friendly(r.error),true); return false; }
+  if(r.error){ if(!reqStale('del'+e.id,t)){ ENTRIES.push(e); renderAll(); } toast(friendly(r.error),true); return false; }
   return true;
 }
 function tryAdd(){
@@ -1515,7 +1574,8 @@ async function commit(row){
   if(crossesDay(parseTime(row.start),parseTime(row.end))) resetTimes();   // next slot is on another day — start afresh
   else { const a=parseTime(row.end); $('#tStart').value=t2s(a); $('#tEnd').value=t2s(Math.min(a+60,DAY_END)); }
   renderAll();
-  const saved=await insertEntry(row);
+  const s0=S, saved=await insertEntry(row);
+  if(S!==s0) return;   // View as / Exit while saving: the screen shows someone else now
   if(saved){ Object.assign(row,saved); delete row._p;
     if(TASK[row.task_id]&&TASK[row.task_id].booked) fetchSuggest(row.task_id);
     lastAdded=row.id; showSaved(row); flashAddBtn(row); }
@@ -1537,7 +1597,7 @@ function showSaved(row){
   box.className='saved on';
   $('#savedShow').onclick=function(){ const el=document.querySelector('#days .e[data-eid="'+row.id+'"]'); if(!el) return;
     el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); };
-  $('#savedUndo').onclick=async function(){ box.className='saved'; lastAdded=null; const ok=await removeEntry(row); if(ok) toast('Removed'); };
+  $('#savedUndo').onclick=async function(){ box.className='saved'; lastAdded=null; const s0=S, ok=await removeEntry(row); if(ok&&S===s0) toast('Removed'); };
   clearTimeout(savedTimer); savedTimer=setTimeout(function(){ box.className='saved'; lastAdded=null; },10000);
 }
 
@@ -1576,12 +1636,14 @@ function renderDays(){
     const row={ id:tempId(),task_id:src.task_id,project_id:src.project_id,date:selDate,mins:src.mins,
                 start:t2s(a), end:t2s(a+src.mins), stage:src.stage,note:src.note,source:'manual',locked:false,_p:true };
     ENTRIES.push(row); renderAll();
-    const saved=await insertEntry(row);
-    if(saved){ Object.assign(row,saved); delete row._p; toast('Copied onto '+fmt(selDate)); }
+    const s0=S, saved=await insertEntry(row);
+    if(S!==s0) return;   // identity changed while saving
+    if(saved){ Object.assign(row,saved); delete row._p; toast('Copied onto '+fmt(row.date)); }
     else ENTRIES=ENTRIES.filter(function(e){return e!==row;});
     renderAll();
   }; });
-  $$('#days .tagchip.miss').forEach(function(b){ b.onclick=function(){
+  $$('#days .tagchip.miss').forEach(function(b){
+    b.onclick=function(){
     const e=ENTRIES.filter(function(x){return String(x.id)===b.dataset.stage;})[0];
     openStageMenu(b,e.stage,function(s){ patchEntry(e,{stage:s}); },e.task_id); }; });
   if(openEdit) wireSheet(); else { sheetBig.open=null; sheetBig.key=null; }   // a closed panel forgets its pending confirm
@@ -1653,7 +1715,7 @@ function wireSheet(){
   ['sA','sB','sDate'].forEach(function(id){ const x=$('#'+id); x.oninput=x.onchange=function(){ sheetHint(e); }; });
   sheetHint(e);
   $('#sCancel').onclick=function(){ sheetBig.key=null; openEdit=null; renderDays(); };
-  $('#sDel').onclick=async function(){ openEdit=null; if(await removeEntry(e)) toast('Entry deleted'); };
+  $('#sDel').onclick=async function(){ openEdit=null; const s0=S; if(await removeEntry(e) && S===s0) toast('Entry deleted'); };
   $('#sSave').onclick=async function(){
     const a=parseTime($('#sA').value), b=parseFinish($('#sB').value,a);
     const t=TASK[e.task_id]||{};
@@ -1679,7 +1741,8 @@ function wireSheet(){
     sheetBig.key=null;
     const moved = day!==e.date;
     openEdit=null;
-    if(await patchEntry(e,patch)) toast(moved?'Saved — moved to '+fmt(day):'Saved');
+    const s0=S;
+    if(await patchEntry(e,patch) && S===s0) toast(moved?'Saved — moved to '+fmt(day):'Saved');
   };
 }
 
@@ -1911,7 +1974,8 @@ async function finishCalPick(p,id,stage){
   const row={ id:tempId(),task_id:id,project_id:TASK[id].project_id,date:p.date,
               mins:p.b-p.a,start:t2s(p.a),end:t2s(p.b),stage:stage,note:'',source:'manual',locked:false,_p:true };
   ENTRIES.push(row); renderAll();
-  const saved=await insertEntry(row);
+  const s0=S, saved=await insertEntry(row);
+  if(S!==s0) return;   // identity changed while saving
   if(saved){ Object.assign(row,saved); delete row._p; toast(hm(row.mins)+' logged on '+fmt(p.date)+(stageName(stage)?' · '+stageName(stage):'')); }
   else ENTRIES=ENTRIES.filter(function(e){return e!==row;});
   renderAll();
@@ -1960,14 +2024,16 @@ const cellMins=(task,date)=>ENTRIES.filter(function(e){return e.task_id===task&&
   .reduce(function(a,e){return a+e.mins;},0);
 async function setCell(task,date,mins){
   if(guardRO()){ renderWeek(); return false; }
-  const hits=ENTRIES.filter(function(e){return e.task_id===task&&e.date===date;});
-  if(!mins){ let ok=true; for(const h of hits){ if(!(await removeEntry(h))) ok=false; } return ok; }
+  const hits=ENTRIES.filter(function(e){return e.task_id===task&&e.date===date;}), s0=S;
+  // 一格幾筆要分幾步寫；中途 View as／Exit 就停，紅色講明只存咗一部分，唔好靜靜留低半格
+  const half=function(){ toast('Only part of '+fmt(date)+' was saved — the screen changed while saving. Check that day in your week.',true); return false; };
+  if(!mins){ let ok=true; for(const h of hits){ if(S!==s0) return half(); if(!(await removeEntry(h))) ok=false; } return ok; }
   if(hits.length){
     const h=hits[0];
     const patch = h.start ? {mins:mins,end:t2s(parseTime(h.start)+mins)} : {mins:mins};
     // 其餘幾筆只有喺第一筆真係收咗新數之後先算多餘，改唔到就一筆都唔好刪
-    if(!(await patchEntry(h,patch))){ renderWeek(); return false; }
-    for(let i=1;i<hits.length;i++) await removeEntry(hits[i]);
+    if(!(await patchEntry(h,patch))){ if(S===s0) renderWeek(); return false; }
+    for(let i=1;i<hits.length;i++){ if(S!==s0) return half(); await removeEntry(hits[i]); }
     return true;
   } else {
     const t=TASK[task];
@@ -2010,13 +2076,15 @@ function renderWeek(){
   $$('#wbody .cell').forEach(function(inp){
     inp.onfocus=function(){ inp.select(); };
     inp.onchange=async function(){
+      const wt=reqTicket('wkSaved');   // a slower earlier cell must not say "saved" after a newer one
       $('#wkSaved').textContent='';   // a stale "saved" next to a rejected cell reads as success (Adrian 11-06 #14)
       const v=inp.value.trim(), m=v===''?0:weekMins(v);
       if(m===null){ toast('Try 1.5, 90m or 1:30',true); inp.value=inp.defaultValue; return; }   // nothing saved: show what is stored
       const t=TASK[inp.dataset.task];
       if(m&&t.booked&&!t.suggest){ toast('That deliverable needs a stage — set one on the Log screen first',true); inp.value=inp.defaultValue; return; }
-      const ok=await setCell(inp.dataset.task,inp.dataset.date,m);
-      $('#wkSaved').textContent=ok?'saved':''; renderAll();
+      const s0=S, ok=await setCell(inp.dataset.task,inp.dataset.date,m);
+      if(S!==s0) return;   // identity changed while saving: no "saved" beside someone else's week
+      if(!reqStale('wkSaved',wt)) $('#wkSaved').textContent=ok?'saved':''; renderAll();
     };
   });
   // chart
@@ -2037,12 +2105,13 @@ $('#wPrev').onclick=function(){ weekMon=shift(weekMon,-7); renderWeek(); };
 $('#wNext').onclick=function(){ weekMon=shift(weekMon,7); renderWeek(); };
 $('#copyLast').onclick=async function(){
   if(guardRO()) return;
-  const prev=weekDays(shift(weekMon,-7)), cur=weekDays(weekMon); let n=0;
-  for(let i=0;i<5;i++){
+  const prev=weekDays(shift(weekMon,-7)), cur=weekDays(weekMon), s0=S; let n=0;
+  for(let i=0;i<5&&S===s0;i++){
     if(cur[i]>S.today) continue;
     const tasks=[]; ENTRIES.forEach(function(e){ if(e.date===prev[i]&&tasks.indexOf(e.task_id)<0) tasks.push(e.task_id); });
-    for(const id of tasks){ if(cellMins(id,cur[i])) continue; if(await setCell(id,cur[i],cellMins(id,prev[i]))) n++; }
+    for(const id of tasks){ if(S!==s0) break; if(cellMins(id,cur[i])) continue; if(await setCell(id,cur[i],cellMins(id,prev[i]))) n++; }
   }
+  if(S!==s0){ toast('Copy last week stopped part way ('+n+' cells copied) — the screen changed while copying. Check your week.',true); return; }   // same as a half-saved cell: say so, in red
   renderAll(); toast(n?('Copied '+n+' cells from last week'):'Nothing to copy \u2014 every cell last week filled is already filled this week (or falls after today)',!n);
 };
 
@@ -2182,9 +2251,11 @@ async function loadJobs(){
   const byCreated=$('#jDateKind').value==='created';
   const args={ p_scope:$('#jScope').value, p_from:$('#jFrom').value, p_to:byCreated?S.today:$('#jTo').value };
   if(VIEW_AS) args.p_as=VIEW_AS.id;
+  const t=reqTicket('jobs');
   const r=await sb.rpc('jobs_overview',args);
+  if(reqStale('jobs',t)) return;
   if(r.error){ $('#jBody').innerHTML='<tr><td colspan="10" class="jempty">'+esc(friendly(r.error))+'</td></tr>'; return; }
-  JOBS=r.data; jobsOpen=null; renderJobs();
+  JOBS=r.data; jobsOpen=null; JOBX={}; renderJobs();
 }
 function jobStatusPill(st){
   const s=st||'—';
@@ -2227,35 +2298,45 @@ function renderJobs(){
       '<td class="h'+(j.hours_total?'':' zero')+'">'+hm(Math.round(j.hours_total*60))+'</td>'+
       '<td class="last">'+(j.last?fmt(j.last):'—')+'</td>'+
       '<td class="tg"><button class="jtg'+(open?' on':'')+'" data-tg="'+j.task_id+'" title="'+(open?'Hide entries':'Show entries')+'">'+(open?'&#9662;':'&#9656;')+'</button></td></tr>'+
-      (open?'<tr class="jx"><td colspan="10" class="jx" id="jxCell">Loading entries…</td></tr>':'');
+      (open?'<tr class="jx"><td colspan="10" class="jx" id="jxCell">'+(typeof JOBX[j.task_id]==='string'?JOBX[j.task_id]:'Loading entries…')+'</td></tr>':'');
   }).join('');
   $$('#jBody .jtg').forEach(function(b){ b.onclick=function(ev){ ev.stopPropagation();
-    jobsOpen = jobsOpen===b.dataset.tg ? null : b.dataset.tg; renderJobs(); if(jobsOpen) loadJobEntries(jobsOpen); }; });
+    jobsOpen = jobsOpen===b.dataset.tg ? null : b.dataset.tg; if(jobsOpen) delete JOBX[jobsOpen]; renderJobs(); }; });   // opening reloads, as before; other re-renders reuse it
+  if(jobsOpen && JOBX[jobsOpen]===undefined) loadJobEntries(jobsOpen);
 }
 async function loadJobEntries(taskId){
   const j=(JOBS.rows||[]).filter(function(x){return x.task_id===taskId;})[0]; if(!j) return;
   const to=S.today, from=shift(to,-365);
+  const mark={}; JOBX[taskId]=mark;   // pending; a Run or identity change replaces JOBX and retires this answer
   const r=await sb.rpc('report_data',{ p_from:from, p_to:to, p_projects:[j.project_id], p_round:0, p_mode:'exact', p_limit:2000 });
-  const cell=$('#jxCell'); if(!cell) return;
-  if(r.error){ cell.textContent=friendly(r.error); return; }
-  const rows=((r.data&&r.data.rows)||[]).filter(function(e){ return String(e.task_id)===String(taskId); })
-    .sort(function(a,b){ return a.date<b.date?1:-1; });
-  if(!rows.length){ cell.innerHTML='<span class="mini">No time logged on this item in the last 12 months.</span>'; return; }
-  cell.innerHTML='<table><thead><tr><th>Date</th><th>Who</th><th>Stage</th><th class="n">Hours</th><th>Note</th><th>Source</th></tr></thead><tbody>'+
-    rows.slice(0,60).map(function(e){ return '<tr><td>'+fmt(e.date)+'</td><td>'+esc(e.user||'')+'</td><td>'+esc(e.stage||'—')+'</td>'+
-      '<td class="n">'+hm(Math.round(e.mins))+'</td><td>'+esc(e.note||'')+'</td><td class="mini">'+esc(e.source||'')+'</td></tr>'; }).join('')+
-    '</tbody></table>'+(rows.length>60?'<div class="mini" style="margin-top:6px">Showing the latest 60 of '+rows.length+'.</div>':'');
+  if(JOBX[taskId]!==mark) return;
+  let html;
+  if(r.error) html=esc(friendly(r.error));
+  else {
+    const rows=((r.data&&r.data.rows)||[]).filter(function(e){ return String(e.task_id)===String(taskId); })
+      .sort(function(a,b){ return a.date<b.date?1:-1; });
+    html = !rows.length ? '<span class="mini">No time logged on this item in the last 12 months.</span>'
+      : '<table><thead><tr><th>Date</th><th>Who</th><th>Stage</th><th class="n">Hours</th><th>Note</th><th>Source</th></tr></thead><tbody>'+
+        rows.slice(0,60).map(function(e){ return '<tr><td>'+fmt(e.date)+'</td><td>'+esc(e.user||'')+'</td><td>'+esc(e.stage||'—')+'</td>'+
+          '<td class="n">'+hm(Math.round(e.mins))+'</td><td>'+esc(e.note||'')+'</td><td class="mini">'+esc(e.source||'')+'</td></tr>'; }).join('')+
+        '</tbody></table>'+(rows.length>60?'<div class="mini" style="margin-top:6px">Showing the latest 60 of '+rows.length+'.</div>':'');
+  }
+  JOBX[taskId]=html;
+  if(jobsOpen!==taskId) return;   // another item is open now: keep this one for when it is opened again
+  const cell=$('#jxCell'); if(cell) cell.innerHTML=html;
 }
 $('#jRun').onclick=loadJobs;
 $('#jScope').onchange=loadJobs;
-let jView='items', CAMPS=null;
+let jView='items', CAMPS=null, JOBX={};   // JOBX: task_id -> entries HTML for the open row (or a pending marker)
 $$('.jview button').forEach(function(b){ b.onclick=function(){
   $$('.jview button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); jView=b.dataset.jv;
   $('#jItems').style.display = jView==='items'?'':'none'; $('#jFilters').style.display = jView==='items'?'':'none'; $('#jCamp').style.display = jView==='camp'?'':'none';
   if(jView==='camp' && !CAMPS) loadCamps(); }; });
 async function loadCamps(){
   $('#campBody').innerHTML='<tr><td colspan="10" class="jempty">Loading…</td></tr>';
+  const t=reqTicket('camps');
   const r=await sb.rpc('campaign_list',{p_include_archived:$('#campArch').value==='1'});
+  if(reqStale('camps',t)) return;
   if(r.error){ $('#campBody').innerHTML='<tr><td colspan="10" class="jempty">'+esc(friendly(r.error))+'</td></tr>'; return; }
   CAMPS=r.data||[]; renderCamps();
 }
@@ -2298,17 +2379,20 @@ $('#jQ').oninput=renderJobs; $('#jDateKind').onchange=loadJobs;
 /* ================= FAVOURITES ================= */
 let FAVS={};
 async function loadFavs(){
+  const t=reqTicket('favs');
   const r=await sb.from('favourites').select('task_id');
+  if(reqStale('favs',t)) return;   // identity changed meanwhile: these are someone else's stars
   if(!r.error){ FAVS={}; (r.data||[]).forEach(function(x){ FAVS[x.task_id]=1; }); }
 }
 async function toggleFav(id){
   if(guardRO()) return;
+  const s0=S;   // after View as / Exit, FAVS holds someone else's stars: no undo into them
   if(FAVS[id]){ delete FAVS[id]; renderRows();
     const r=await sb.from('favourites').delete().eq('task_id',id);
-    if(r.error){ FAVS[id]=1; renderRows(); toast(friendly(r.error),true); } }
+    if(r.error){ if(S===s0){ FAVS[id]=1; renderRows(); } toast(friendly(r.error),true); } }
   else { FAVS[id]=1; renderRows();
     const r=await sb.from('favourites').insert({user_id:S.me.id,task_id:id});
-    if(r.error){ delete FAVS[id]; renderRows(); toast(friendly(r.error),true); } }
+    if(r.error){ if(S===s0){ delete FAVS[id]; renderRows(); } toast(friendly(r.error),true); } }
 }
 
 /* ================= REPORTS ================= */
@@ -2328,8 +2412,9 @@ function fillRepFilters(){
   const t=S.stages.map(function(x){ return '<option value="'+x.id+'">'+esc(x.name)+'</option>'; }).join('');
   $('#rTag').innerHTML='<option value="">All stages</option>'+t;
   const r=rangeFor('week'); $('#rFrom').value=r[0]; $('#rTo').value=r[1];
+  const tk=reqTicket('scope');
   sb.rpc('report_scope').then(function(res){
-    if(res.error) return;
+    if(reqStale('scope',tk) || res.error) return;   // identity changed or filled again meanwhile
     // in preview the Person list is what the previewed person can see: everyone for admins / sales admins, otherwise themselves + their manager_scope
     const people = (VIEW_AS&&pvScope()) ? pvPeople() : (res.data||[]);
     $('#rUser').innerHTML='<option value="">Everyone I can see ('+people.length+')</option>'+
@@ -2339,17 +2424,23 @@ function fillRepFilters(){
       ((res.data||[]).length===1?' person':' people')+(S.me.is_admin?' · amounts visible':' · amounts hidden');
   });
 }
-async function runReport(){
+async function runReport(src){
+  if(src!=='monthly') reqTicket('monthly');   // a plain Run or range change: a pending Monthly economics answer is for the old range
   const from=$('#rFrom').value, to=$('#rTo').value;
   if(!from||!to) return toast('Pick a date range',true);
+  const eh=$('#rBody tr.editrow');   // another row's Save refreshes the list: keep what is being typed here
+  if(eh&&repEdit&&eh.dataset.for===repEdit) repKeep={id:repEdit,v:['#eD','#eS','#eA','#eB','#eN'].map(function(q){ const x=$(q); return x?x.value:null; })};
+  else if(!repKeep||repKeep.id!==repEdit) repKeep=null;
   $('#rBody').innerHTML='<div class="card2">Running…</div>';
   const rr=$('#rRound').value.split('|');
   const args={ p_from:from, p_to:to, p_round:+rr[0], p_mode:rr[1] };
   if($('#rUser').value) args.p_users=[$('#rUser').value]; else if(VIEW_AS&&pvScope()) args.p_users=pvScope();
   if($('#rTag').value)  args.p_tags=[$('#rTag').value];
   if($('#rQ').value.trim()) args.p_q=$('#rQ').value.trim();
+  const t=reqTicket('report');
   const r=await sb.rpc('report_data',args);
-  if(r.error){ $('#rBody').innerHTML=''; return toast(friendly(r.error),true); }
+  if(reqStale('report',t)) return false;
+  if(r.error){ REP=null; $('#rBody').innerHTML=''; $('#rKpis').innerHTML=''; toast(friendly(r.error),true); return false; }   // no old report left to be relabelled with the new range
   REP=r.data; if(VIEW_AS&&!S.me.is_admin) REP.can_see_amounts=false; // preview shows what they see: amounts are admin-only
   renderReport();
 }
@@ -2390,11 +2481,13 @@ async function runMonthly(){
   moMonth=ym; const r=monthRange(ym); $('#rFrom').value=r[0]; $('#rTo').value=r[1];
   $('#rRound').value='0|exact'; $('#rQuick').value='';
   ECON={}; // never paint another month's economics against this month's IOs
-  await runReport();
+  const t=reqTicket('monthly');
+  if(await runReport('monthly')===false || reqStale('monthly',t)) return;   // a newer run owns the screen
   if(!REP || !(S.me.is_admin || S.isSalesAdmin)) return;
   const ios=Object.keys((REP.rows||[]).reduce(function(m,e){ if(e.io_eff) m[e.io_eff]=1; return m; },{}));
   if(!ios.length){ ECON={}; return; }
   const ec=await sb.rpc('io_economics',{p_ios:ios});
+  if(reqStale('monthly',t)) return;
   if(ec.error){ toast(friendly(ec.error),true); return; }
   ECON={}; (ec.data||[]).forEach(function(x){ ECON[x.io]=x; });
   if(rTab==='monthly') renderMonthly(REP.rows||[]);
@@ -2634,7 +2727,9 @@ async function runDash(){
   const r=rangeFor($('#dRange').value);
   const rr=($('#rRound')?$('#rRound').value:'15|up').split('|');
   const dargs={p_from:r[0],p_to:r[1],p_round:+rr[0],p_mode:rr[1]}; if(VIEW_AS&&pvScope()) dargs.p_users=pvScope();
+  const t=reqTicket('dash');
   const res=await sb.rpc('report_data',dargs);
+  if(reqStale('dash',t)) return;
   if(res.error||!res.data) return toast(res.error?friendly(res.error):'The dashboard came back empty — press Refresh',true);
   if(VIEW_AS&&!S.me.is_admin) res.data.can_see_amounts=false;
   const rows=res.data.rows||[], tot=rows.reduce(function(a,e){return a+e.mins;},0);
@@ -2691,28 +2786,27 @@ const roleLabel2=r=>({member:'Member',project_manager:'Project manager',
   team_manager:'Team manager',admin:'Admin'}[r]||r);
 
 async function admLoad(force){
-  if(aTab==='people' && (!STAFF||force)){ const r=await sb.rpc('admin_staff');
-    if(r.error) return toast(friendly(r.error),true); STAFF=r.data; }
-  if(aTab==='tags' && (!TAGS||force)){ const r=await sb.rpc('admin_tags');
-    if(r.error) return toast(friendly(r.error),true); TAGS=r.data; }
-  if(aTab==='rules' && (!RULES||force)){ const r=await sb.rpc('admin_rules');
-    if(r.error) return toast(friendly(r.error),true); RULES=r.data;
-    if(!GROUPS){ const g=await sb.rpc('admin_groups'); if(!g.error) GROUPS=g.data; } }
-  if(aTab==='groups' && (!GROUPS||force)){ const r=await sb.rpc('admin_groups');
-    if(r.error) return toast(friendly(r.error),true); GROUPS=r.data; }
-  if(aTab==='lock' && (!LOCKS||force)){ const r=await sb.rpc('admin_lock_overview',{p_months:8});
-    if(r.error) return toast(friendly(r.error),true); LOCKS=r.data; }
-  if(aTab==='act'){
+  const t=reqTicket('adm'), tab=aTab;   // switching tab or filter mid-load: only the newest load paints
+  const late=function(){ return reqStale('adm',t)||aTab!==tab; };
+  // each cache keeps the newest answer for itself, even when the screen has moved on (a save's refresh must not be lost)
+  async function get(key,rpc,args){ if(late()) return null; const k='admc_'+key, n=reqTicket(k); const r=await sb.rpc(rpc,args); return reqStale(k,n)?null:r; }
+  const done=function(){ if(!late()) admRender(); };
+  function bad(r){ if(r.error){ if(!late()) toast(friendly(r.error),true); return true; } return false; }
+  if(tab==='people' && (!STAFF||force)){ const r=await get('staff','admin_staff'); if(!r) return done(); if(bad(r)) return; STAFF=r.data; }
+  if(tab==='tags' && (!TAGS||force)){ const r=await get('tags','admin_tags'); if(!r) return done(); if(bad(r)) return; TAGS=r.data; }
+  if(tab==='rules' && (!RULES||force)){ const r=await get('rules','admin_rules'); if(!r) return done(); if(bad(r)) return; RULES=r.data;
+    if(!GROUPS){ const g=await get('groups','admin_groups'); if(g&&!g.error) GROUPS=g.data; } }
+  if(tab==='groups' && (!GROUPS||force)){ const r=await get('groups','admin_groups'); if(!r) return done(); if(bad(r)) return; GROUPS=r.data; }
+  if(tab==='lock' && (!LOCKS||force)){ const r=await get('locks','admin_lock_overview',{p_months:8}); if(!r) return done(); if(bad(r)) return; LOCKS=r.data; }
+  if(tab==='act'){
     if(!actF.from){ actF.to=S.today; actF.from=shift(S.today,-7); }
-    if(!STAFF){ const st=await sb.rpc('admin_staff'); if(!st.error) STAFF=st.data; }
-    const r=await sb.rpc('admin_activity',{p_from:actF.from,p_to:actF.to,
-      p_user:actF.user||null, p_action:actF.action||null, p_limit:500});
-    if(r.error) return toast(friendly(r.error),true); ACTS=r.data; }
-  if(aTab==='effort' && (!EFFORT||force)){
+    if(!STAFF){ const st=await get('staff','admin_staff'); if(st&&!st.error) STAFF=st.data; }
+    const r=await get('acts','admin_activity',{p_from:actF.from,p_to:actF.to,
+      p_user:actF.user||null, p_action:actF.action||null, p_limit:500}); if(!r) return done(); if(bad(r)) return; ACTS=r.data; }
+  if(tab==='effort' && (!EFFORT||force)){
     const from=$('#rFrom')?$('#rFrom').value:shift(S.today,-90), to=$('#rTo')?$('#rTo').value:S.today;
-    const r=await sb.rpc('margin_by_booking',{p_from:from,p_to:to,p_min_hours:0.5});
-    if(r.error) return toast(friendly(r.error),true); EFFORT=r.data; }
-  admRender();
+    const r=await get('effort','margin_by_booking',{p_from:from,p_to:to,p_min_hours:0.5}); if(!r) return done(); if(bad(r)) return; EFFORT=r.data; }
+  if(!late()) admRender();
 }
 function admRender(){
   const b=$('#admBody');
@@ -2809,8 +2903,15 @@ function admLock(b){
 // the PACMAN role -> Cronus role mapping the nightly sync applies (02_provision_from_pacman; 112_: sync never grants admin, admins are set by hand)
 function pacmanMaps(r){ return ({Sales_Admin:'project_manager',Sales_Admin_TH:'project_manager',PM:'project_manager'})[r]||'member'; }
 let peopleFilter='pilot', peopleQ='';
+const PPL_BUSY={};   // people rows mid-save, by user id: survives a list rebuild, so the new row's Save can't send it twice
 function admPeople(b){
   if(!STAFF) { b.innerHTML='<div class="card2">Loading…</div>'; return; }
+  const keep={};   // rows with unsaved changes: put them back after the list is rebuilt
+  b.querySelectorAll('tbody tr[data-u]').forEach(function(tr){ const sv=tr.querySelector('.sv2.dirty'); if(!sv) return;
+    keep[tr.dataset.u]={role:tr.querySelector('.fRole').value, tracks:tr.querySelector('.fTracks').checked, pilot:tr.querySelector('.fPilot').checked,
+      status:tr.querySelector('.fStatus').value, rate:tr.querySelector('.fRate').value}; });
+  const pv=function(tr){ return [tr.querySelector('.fRole').value,tr.querySelector('.fTracks').checked,tr.querySelector('.fPilot').checked,
+    tr.querySelector('.fStatus').value,tr.querySelector('.fRate').value.trim()].join('\u0001'); };
   let list=STAFF.slice();
   if(peopleFilter==='pilot')    list=list.filter(u=>u.pilot);
   if(peopleFilter==='tracking') list=list.filter(u=>u.tracks_time);
@@ -2853,9 +2954,13 @@ function admPeople(b){
   $('#pQ').onchange=function(){ peopleQ=this.value; admPeople(b); };
   b.querySelectorAll('tbody tr').forEach(function(tr){
     const mark=function(){ tr.querySelector('.sv2').classList.add('dirty'); };
-    tr.querySelectorAll('select,input').forEach(function(el){ el.onchange=mark; });
+    const k=keep[tr.dataset.u];
+    if(k){ tr.querySelector('.fRole').value=k.role; tr.querySelector('.fTracks').checked=k.tracks; tr.querySelector('.fPilot').checked=k.pilot;
+      tr.querySelector('.fStatus').value=k.status; tr.querySelector('.fRate').value=k.rate; mark(); }
+    tr.querySelectorAll('select,input').forEach(function(el){ el.oninput=el.onchange=mark; });   // typing counts too: a rebuild mid-typing keeps the row
     tr.querySelector('.sv2').onclick=async function(){
-      const id=tr.dataset.u, before=STAFF.filter(function(x){return x.id===id;})[0];
+      const id=tr.dataset.u, before=STAFF.filter(function(x){return x.id===id;})[0], snap=pv(tr);
+      if(PPL_BUSY[id]) return;   // still saving this person (the row may have been rebuilt meanwhile)
       const role=tr.querySelector('.fRole').value;
       const tracks=tr.querySelector('.fTracks').checked;
       const pilot=tr.querySelector('.fPilot').checked;
@@ -2869,6 +2974,7 @@ function admPeople(b){
       if(status!==before.status) args.p_status=status;
       let ok=true;
       if(guardRO()){ btn.disabled=false; return; }
+      PPL_BUSY[id]=1;
       if(Object.keys(args).length>1){
         const r=await sb.rpc('admin_set_user',args);
         if(r.error){ toast(friendly(r.error),true); ok=false; }
@@ -2877,8 +2983,10 @@ function admPeople(b){
         const r=await sb.rpc('admin_set_rate',{p_user:id,p_rate:Number(rateRaw)});
         if(r.error){ toast(friendly(r.error),true); ok=false; }
       }
-      btn.disabled=false;
-      if(ok){ btn.classList.remove('dirty'); toast(before.name+' updated'); await admLoad(true); }
+      delete PPL_BUSY[id]; btn.disabled=false;
+      if(ok){ const cur=b.querySelector('tbody tr[data-u="'+id+'"]')||tr;   // the list may have been rebuilt while saving
+        if(pv(cur)===snap) cur.querySelector('.sv2').classList.remove('dirty');   // changed again meanwhile: still unsaved
+        toast(before.name+' updated'); await admLoad(true); }
     };
   });
 }
@@ -2930,6 +3038,10 @@ function admEffort(b){
 /* ---- tags ---- */
 function admTags(b){
   if(!TAGS){ b.innerHTML='<div class="card2">Loading…</div>'; return; }
+  const tv=function(tr){ return [tr.querySelector('.tName').value,tr.querySelector('.tKind').value,tr.querySelector('.tSort').value,
+    tr.querySelector('.tRep').checked,tr.querySelector('.tArc').checked]; };
+  const keep={};   // rows with unsaved changes: put them back after the list is rebuilt
+  b.querySelectorAll('tbody tr[data-t]').forEach(function(tr){ if(tr.querySelector('.sv2.dirty')) keep[tr.dataset.t]=tv(tr); });
   b.innerHTML='<div class="tblwrap"><table class="adm"><thead><tr><th>Stage</th><th>Kind</th>'+
    '<th class="n">Order</th><th>Repeatable</th><th>Archived</th><th class="n">Used</th><th></th></tr></thead><tbody>'+
    TAGS.map(function(t){
@@ -2948,16 +3060,24 @@ function admTags(b){
    '</tbody></table></div><p class="note">Order drives the next-stage suggestion when someone logs time. '+
    'Archiving keeps history intact and removes it from the picker. A stage that is already used cannot be deleted, only archived.</p>';
   b.querySelectorAll('tbody tr').forEach(function(tr){
+    const mark=function(){ tr.querySelector('.sv2').classList.add('dirty'); };
+    const k=keep[tr.dataset.t];
+    if(k){ tr.querySelector('.tName').value=k[0]; tr.querySelector('.tKind').value=k[1]; tr.querySelector('.tSort').value=k[2];
+      tr.querySelector('.tRep').checked=k[3]; tr.querySelector('.tArc').checked=k[4]; mark(); }
+    tr.querySelectorAll('select,input').forEach(function(el){ el.oninput=el.onchange=mark; });
     tr.querySelector('.sv2').onclick=async function(){
       if(guardRO()) return;
+      const id=tr.dataset.t, snap=tv(tr).join('\u0001'), s0=S, st=reqTicket('stages');
       const r=await sb.rpc('admin_tag_save',{
         p_id:tr.dataset.t||null, p_name:tr.querySelector('.tName').value,
         p_kind:tr.querySelector('.tKind').value, p_sort:+tr.querySelector('.tSort').value,
         p_repeatable:tr.querySelector('.tRep').checked, p_archived:tr.querySelector('.tArc').checked});
       if(r.error) return toast(friendly(r.error),true);
+      const cur=b.querySelector('tbody tr[data-t="'+id+'"]')||tr;   // the list may have been rebuilt while saving
+      if(tv(cur).join('\u0001')===snap) cur.querySelector('.sv2').classList.remove('dirty');   // changed again meanwhile: still unsaved
       toast('Saved'); await admLoad(true);
       const b2=await sb.rpc('bootstrap',{p_days:60});   // stages changed; refresh the picker
-      if(!b2.error && b2.data && !b2.data.error){ S.stages=b2.data.stages; renderAll(); }
+      if(S===s0 && !reqStale('stages',st) && !b2.error && b2.data && !b2.data.error){ S.stages=b2.data.stages; renderAll(); }
     };
   });
 }
@@ -2999,6 +3119,10 @@ function admRules(b){
         (r?' <button class="cn rDry" style="padding:5px 9px;font-size:13px">Test</button>'+
             ' <button class="del rDel" style="padding:5px 9px;font-size:13px">Delete</button>':'')+'</td></tr>';
   };
+  const rv=function(tr){ return [tr.querySelector('.rEnabled').value,tr.querySelector('.rCmp').value,tr.querySelector('.rThr').value,
+    tr.querySelector('.rPer').value,tr.querySelector('.rDow').value,tr.querySelector('.rDom').value,tr.querySelector('.rGrp').value,tr.querySelector('.rNot').value]; };
+  const keep={};   // rows with unsaved changes: put them back after the list is rebuilt
+  b.querySelectorAll('tbody tr[data-r]').forEach(function(tr){ if(tr.querySelector('.sv2.dirty')) keep[tr.dataset.r]=rv(tr); });
   b.innerHTML='<div class="caveat"><b>Mail is live.</b> A tick runs every morning at 09:00 Hong Kong time and sends the rules that are due that day: '+
    'weekly rules on their weekday, monthly rules on their day of the month. Each person gets one mail per rule per period. '+
    'Use <b>Test</b> to see exactly who a rule would notify right now, without sending anything.</div>'+
@@ -3015,10 +3139,16 @@ function admRules(b){
     per.onchange=function(){ const mo=per.value==='monthly', dy=per.value==='daily';
       tr.querySelector('.soWk').style.display=(mo||dy)?'none':'';
       tr.querySelector('.soMo').style.display=mo?'':'none'; };
-    per.onchange();
     if(rid){ const rr=RULES.filter(function(x){return x.id===rid;})[0]; if(rr&&rr.group_id) g.value=rr.group_id; }
+    const mark=function(){ tr.querySelector('.sv2').classList.add('dirty'); };
+    const k=keep[rid];
+    if(k){ ['.rEnabled','.rCmp','.rThr','.rPer','.rDow','.rDom','.rGrp','.rNot'].forEach(function(c,i){ tr.querySelector(c).value=k[i]; }); mark(); }
+    per.onchange();
+    tr.querySelectorAll('select,input').forEach(function(el){ const f=el.onchange;
+      el.oninput=mark; el.onchange=function(){ if(f) f.call(el); mark(); }; });
     tr.querySelector('.sv2').onclick=async function(){
       if(guardRO()) return;
+      const snap=rv(tr).join('\u0001');
       const r=await sb.rpc('admin_rule_save',{
         p_id:rid||null, p_comparator:tr.querySelector('.rCmp').value,
         p_threshold_min:Math.round(parseFloat(tr.querySelector('.rThr').value||'0')*60),
@@ -3026,6 +3156,8 @@ function admRules(b){
         p_notify:tr.querySelector('.rNot').value, p_group:g.value||null,
         p_enabled:tr.querySelector('.rEnabled').value==='1', p_role:null});
       if(r.error) return toast(friendly(r.error),true);
+      const cur=b.querySelector('tbody tr[data-r="'+rid+'"]')||tr;   // the list may have been rebuilt while saving
+      if(rv(cur).join('\u0001')===snap) cur.querySelector('.sv2').classList.remove('dirty');   // changed again meanwhile: still unsaved
       toast('Rule saved'); await admLoad(true);
     };
     if(tr.querySelector('.rDel')) tr.querySelector('.rDel').onclick=async function(){
@@ -3033,10 +3165,13 @@ function admRules(b){
       const r=await sb.rpc('admin_rule_delete',{p_id:rid});
       if(r.error) return toast(friendly(r.error),true); toast('Rule deleted'); await admLoad(true); };
     if(tr.querySelector('.rDry')) tr.querySelector('.rDry').onclick=async function(){
+      const t=reqTicket('dry');
       const r=await sb.rpc('admin_rule_dryrun',{p_id:rid});
+      if(reqStale('dry',t)) return;   // a newer Test, or another identity, owns the box
       if(r.error) return toast(friendly(r.error),true);
-      const d=r.data;
-      $('#dryOut').innerHTML='<div class="card2" style="margin-top:12px"><h3>Would notify '+
+      const d=r.data, out=$('#dryOut');
+      if(aTab!=='rules'||!out) return;   // left the Rules tab meanwhile
+      out.innerHTML='<div class="card2" style="margin-top:12px"><h3>Would notify '+
         d.would_notify+' '+(d.would_notify===1?'person':'people')+' right now</h3>'+
         (d.who&&d.who.length?'<div class="tblwrap"><table class="adm"><thead><tr><th>Person</th>'+
           '<th class="n">Logged this '+(d.period==='weekly'?'week':d.period==='monthly'?'month':'day')+'</th></tr></thead><tbody>'+
@@ -3062,7 +3197,7 @@ $$('.atab').forEach(function(b){ b.onclick=function(){
   aTab=b.dataset.a; admLoad(false); }; });
 
 /* ================= edit anyone's entry, from the Detailed report ================= */
-let repEdit=null, repBig={key:null,at:0};
+let repEdit=null, repBig={key:null,at:0}, repKeep=null;   // repKeep: typed values of the open edit box across a refresh
 function wireDetailedEdit(){
   $$('#rBody tbody tr[data-e]').forEach(function(tr){
     tr.style.cursor='pointer';
@@ -3075,6 +3210,9 @@ function wireDetailedEdit(){
   if(repBig.open!==repEdit){ repBig.open=repEdit; repBig.key=null; }   // another row, or none: no pending confirm
   const host=$('#rBody tr.editrow'); if(!host) return;
   const e=(REP.rows||[]).filter(function(x){return String(x.id)===repEdit;})[0]; if(!e) return;
+  const mine=repEdit;   // after a save, close this box only if it is still the open one
+  if(repKeep&&repKeep.id===repEdit) ['#eD','#eS','#eA','#eB','#eN'].forEach(function(q,i){ const x=$(q); if(x&&repKeep.v[i]!==null) x.value=repKeep.v[i]; });
+  repKeep=null;
   const eHint=function(){   // same as the entry bar: say where the entry ends when the box is not that clock time
     const a=parseTime($('#eA').value), b=parseFinish($('#eB').value,a), el=$('#eHint'); if(!el) return;
     if(a===null||b===null){ el.textContent=''; return; }
@@ -3104,19 +3242,19 @@ function wireDetailedEdit(){
     repBig.key=null;
     const r=await sb.from('time_entries').update(patch).eq('id',e.id);
     if(r.error) return toast(friendly(r.error),true);
-    repEdit=null; toast('Saved — '+e.user+'’s entry'); runReport();
+    if(repEdit===mine) repEdit=null; toast('Saved — '+e.user+'’s entry'); runReport();
   };
   $('#eCancel').onclick=function(){ repBig.key=null; repEdit=null; renderReport(); };
   $('#eDel').onclick=async function(){
     if(guardRO()) return;
     const r=await sb.from('time_entries').delete().eq('id',e.id);
     if(r.error) return toast(friendly(r.error),true);
-    repEdit=null; toast('Entry deleted'); runReport();
+    if(repEdit===mine) repEdit=null; toast('Entry deleted'); runReport();
   };
 }
 function editRowHTML(e,cols){
   const days=Array.from({length:60},function(_,i){return shift(S.today,-i);});
-  return '<tr class="editrow"><td colspan="'+cols+'"><div class="egrid">'+
+  return '<tr class="editrow" data-for="'+esc(String(e.id))+'"><td colspan="'+cols+'"><div class="egrid">'+
     '<div><label>Start</label><input id="eA" value="'+(e.start||'')+'" placeholder="—"></div>'+
     '<div><label>Finish</label><input id="eB" value="'+(e.end||'')+'" placeholder="—"></div>'+
     '<div><label>Day</label><select id="eD">'+days.map(function(d){
