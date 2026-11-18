@@ -999,6 +999,7 @@ async function startSession(){
   renderAll();
   restoreTimer();
   resetTimes(); paintBar();   // here, not after start(): the SIGNED_IN and back-button paths need it too
+  routeGo();   // a bookmarked #/reports opens Reports once the layout is known
 }
 // Load a bootstrap payload (own or previewed) into the page state. Handlers are wired once elsewhere.
 function applyBoot(d){
@@ -1040,7 +1041,35 @@ function goPanel(k){
   if(k==='rep'){ if(!REP) runReport(); else renderReport(); }
   if(k==='week') renderWeek();
   if(k==='cal') renderCal();
+  routeSet(k,false);
 }
+/* ---------- address bar: #/reports etc. ----------
+   Only a bookmark for the screen. Permissions stay on the server; a screen the role cannot see falls back to its home.
+   The page never reloads for this, and ?as= (or any query) is kept. Supabase sign-in tokens also arrive in the hash, so only "#/" counts. */
+const ROUTE_OF = { log:'log', cal:'calendar', week:'week', dash:'dashboard', jobs:'jobs', rep:'reports', adm:'admin' };
+let ROUTE_LIVE=false;   // false until the first landing has read the address: the layout's own landing must not overwrite a bookmark
+function routeKey(){ const m=/^#\/([a-z]+)\/?$/.exec(location.hash||''); if(!m) return null;
+  for(const k in ROUTE_OF) if(ROUTE_OF[k]===m[1]) return k; return null; }
+function routeHome(){ return ROLE_VIEW==='sales' ? 'jobs' : 'log'; }
+function routeSet(k,push){   // push: a click by the person (Back returns); otherwise the bar just follows the screen
+  if(!ROUTE_LIVE || !ROUTE_OF[k]) return; const h='#/'+ROUTE_OF[k]; if(location.hash===h) return;
+  const u=location.pathname+location.search+h;
+  try{ if(push) history.pushState(null,'',u); else history.replaceState(null,'',u); }catch(e){ console.error(e); }
+}
+function routeGo(){   // the address says a screen: open it if this layout shows it, else the layout's home
+  if(!S || !REAL_ME) return;
+  ROUTE_LIVE=true;
+  const want=routeKey() || routeHome();
+  const a=document.querySelector('.rail a[data-go="'+want+'"]');
+  const ok=a && a.style.display!=='none';
+  const k=ok ? want : routeHome();
+  const on=document.querySelector('.rail a.on');
+  if(on && on.dataset.go===k){ routeSet(k,false); return; }   // already there (e.g. the bar was fixed up)
+  $('#menu').classList.remove('on'); cancelCalPick();   // Back / swipe while a picker is open: it must not float over the next screen
+  const b=document.querySelector('.rail a[data-go="'+k+'"]'); if(b) b.onclick({preventDefault:function(){}, fromRoute:true});
+  routeSet(k,false);
+}
+addEventListener('hashchange', routeGo);
 
 /* ================= PREVIEW TOOLS (admin) =================
    Same idea as Atrium: a role switcher shows the layout each role gets; "View as" loads a real
@@ -1862,7 +1891,7 @@ function renderCal(){
     $$('.rail a').forEach(function(x){x.classList.remove('on');});
     document.querySelector('.rail a[data-go="log"]').classList.add('on');
     $$('.panel').forEach(function(p){p.classList.remove('on');});
-    $('#p-log').classList.add('on'); renderAll();
+    $('#p-log').classList.add('on'); routeSet('log',true); renderAll();
     const el=document.querySelector('.day.focus'); if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
   }; });
 
@@ -2178,6 +2207,7 @@ $$('.rail a').forEach(function(a){ a.onclick=function(e){
   if(a.dataset.go==='cal'){ renderCal();
     const sc=$('#calScroll'); sc.scrollTop=Math.max(0,(8*60-DAY_START)/60*HH); }
   scrollTo(0,0);
+  routeSet(a.dataset.go, !e.fromRoute);   // a click adds a Back step; following the address does not
 }; });
 addEventListener('resize',function(){ if(S&&$('#p-cal').classList.contains('on')) renderCal(); });
 
