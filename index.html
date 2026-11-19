@@ -1507,6 +1507,12 @@ $('#mMake').onclick=async function(){
 function tempId(){ return 'tmp-'+(++tmpSeq); }
 function friendly(err){
   const m=(err.message||'')+' '+(err.hint||'')+' '+(err.details||'');
+  if((err.message||'').indexOf('already_exists')>=0) return 'Already in Cronus'+(err.details?' as '+err.details:'')+'.';   // 134_: details = the existing account's email
+  if((err.message||'').indexOf('bad_email')>=0) return 'That email does not look right.';
+  if((err.message||'').indexOf('bad_role')>=0) return 'Pick a role.';
+  if((err.message||'').indexOf('admin_via_sql')>=0) return 'Admins can only be added by SQL — ask Seek.';
+  if((err.message||'').indexOf('create_check_failed')>=0) return 'The account was not created — nothing was saved. Tell Seek.';
+  if((err.message||'').indexOf('admin_only')>=0) return 'Only an admin can do this.';
   if(m.indexOf('stage_required')>=0) return 'Booked work needs a stage tag.';
   if(m.indexOf('future_date')>=0) return 'Time cannot be logged into the future.';
   if(m.indexOf('date_too_old')>=0) return 'That date is too far back.';
@@ -2934,6 +2940,25 @@ function admLock(b){
 function pacmanMaps(r){ return ({Sales_Admin:'project_manager',Sales_Admin_TH:'project_manager',PM:'project_manager'})[r]||'member'; }
 let peopleFilter='pilot', peopleQ='';
 const PPL_BUSY={};   // people rows mid-save, by user id: survives a list rebuild, so the new row's Save can't send it twice
+let NEWU=null;   // Add user form (134_ admin_create_user): {email,name,role,tracks,pilot,busy}; null = closed
+async function addUser(b){
+  if(guardRO()) return;
+  const f=NEWU;   // this form: after the await only touch f, never whatever NEWU is by then
+  if(!f || f.busy) return;   // one create at a time
+  const em=f.email.trim(), nm=f.name.trim();
+  if(!em || !nm){ toast('Fill in email and name.',true); return; }
+  f.busy=true; ['#nuGo','#nuX'].forEach(function(q){ const x=$(q); if(x) x.disabled=true; });   // no Cancel mid-save either
+  const s0=S, r=await sb.rpc('admin_create_user',{p_email:em,p_name:nm,p_role:f.role,p_tracks:f.tracks,p_pilot:f.pilot});
+  if(S!==s0){ if(NEWU===f) NEWU=null; if(!r.error) toast(nm+' was added, but the screen changed meanwhile — check People.',true); return; }   // View as / Exit while saving
+  f.busy=false;
+  if(NEWU!==f) return;   // form was closed or replaced meanwhile: leave the new one alone
+  ['#nuGo','#nuX'].forEach(function(q){ const x=$(q); if(x) x.disabled=false; });
+  if(r.error){ toast(friendly(r.error),true); return; }
+  toast(nm+' added');
+  NEWU=null; peopleFilter='all'; peopleQ=em.toLowerCase();   // show the new row
+  STAFF=null;   // admLoad only reloads the open tab: if the admin moved to another tab meanwhile, People must still refetch
+  await admLoad(true);
+}
 function admPeople(b){
   if(!STAFF) { b.innerHTML='<div class="card2">Loading…</div>'; return; }
   const keep={};   // rows with unsaved changes: put them back after the list is rebuilt
@@ -2956,7 +2981,18 @@ function admPeople(b){
        return '<option value="'+o[0]+'" '+(peopleFilter===o[0]?'selected':'')+'>'+o[1]+'</option>'; }).join('')+
      '</select></div>'+
      '<div class="fld"><label>Search</label><input id="pQ" value="'+esc(peopleQ)+'" placeholder="name or email"></div>'+
-     '<span class="spacer"></span><span class="mini">'+list.length+' of '+STAFF.length+'</span></div>'+
+     '<span class="spacer"></span><span class="mini">'+list.length+' of '+STAFF.length+'</span>'+
+     (NEWU?'':'<div class="fld"><label>&nbsp;</label><button class="tbtn" id="pAddOpen">+ Add user</button></div>')+'</div>'+
+   (NEWU?'<div class="card2" id="nuForm"><div class="filters">'+
+     '<div class="fld"><label>Email</label><input id="nuEmail" value="'+esc(NEWU.email)+'" placeholder="name@presslogic.com"></div>'+
+     '<div class="fld"><label>Name</label><input id="nuName" value="'+esc(NEWU.name)+'" placeholder="Full name"></div>'+
+     '<div class="fld"><label>Cronus role</label><select id="nuRole">'+ROLES.filter(function(r){ return r!=='admin'; }).map(function(r){   // admins only by SQL (134_ admin_via_sql)
+        return '<option value="'+r+'" '+(NEWU.role===r?'selected':'')+'>'+roleLabel2(r)+'</option>'; }).join('')+'</select></div>'+
+     '<label class="chk"><input type="checkbox" id="nuTracks" '+(NEWU.tracks?'checked':'')+'> Tracks</label>'+
+     '<label class="chk"><input type="checkbox" id="nuPilot" '+(NEWU.pilot?'checked':'')+'> Pilot</label>'+
+     '<span class="spacer"></span><button class="tbtn" id="nuX" '+(NEWU.busy?'disabled':'')+'>Cancel</button><button class="add" id="nuGo" '+(NEWU.busy?'disabled':'')+'>Create</button></div>'+
+     '<p class="note">New colleagues are no longer created from PACMAN (138_) — add them here. Role, Tracks and Pilot are set by hand, so the sync will not change them; '+
+     'to remove someone later, untick Pilot / Tracks or set Inactive. No cost rate is set — add one in the Rate column.</p></div>':'')+
    '<div class="tblwrap"><table class="adm"><thead><tr><th>Name</th><th>PACMAN role</th><th>Cronus role</th>'+
    '<th class="n">Rate</th><th>Tracks</th><th>Pilot</th><th>Status</th><th class="n">Logged</th><th></th></tr></thead><tbody>'+
    list.map(function(u){
@@ -2982,6 +3018,16 @@ function admPeople(b){
   $('#pFil').onchange=function(){ peopleFilter=this.value; admPeople(b); };
   $('#pQ').oninput=function(){ peopleQ=this.value; };
   $('#pQ').onchange=function(){ peopleQ=this.value; admPeople(b); };
+  if($('#pAddOpen')) $('#pAddOpen').onclick=function(){ NEWU={email:'',name:'',role:'member',tracks:true,pilot:true,busy:false}; admPeople(b); $('#nuEmail').focus(); };
+  if(NEWU){
+    $('#nuEmail').oninput=function(){ NEWU.email=this.value; };
+    $('#nuName').oninput=function(){ NEWU.name=this.value; };
+    $('#nuRole').onchange=function(){ NEWU.role=this.value; };
+    $('#nuTracks').onchange=function(){ NEWU.tracks=this.checked; };
+    $('#nuPilot').onchange=function(){ NEWU.pilot=this.checked; };
+    $('#nuX').onclick=function(){ if(NEWU&&NEWU.busy) return; NEWU=null; admPeople(b); };
+    $('#nuGo').onclick=function(){ addUser(b); };
+  }
   b.querySelectorAll('tbody tr').forEach(function(tr){
     const mark=function(){ tr.querySelector('.sv2').classList.add('dirty'); };
     const k=keep[tr.dataset.u];
