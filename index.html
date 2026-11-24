@@ -3160,17 +3160,20 @@ function admTags(b){
 
 /* ---- reminder rules ---- */
 const ISODOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-// weekly rules fire on a weekday, monthly rules on a day of the month, daily rules every weekday
+// weekly rules fire on a weekday, monthly rules on a day of the month (0 = last Mon-Fri of the month, 142_), daily rules every weekday
 function sendOnCell(r){
-  const per=r?r.period:'weekly', d=(r&&r.days&&r.days.length)?r.days[0]:(per==='monthly'?25:1);
+  const per=r?r.period:'weekly', d=(r&&r.days&&r.days.length)?r.days[0]:(per==='monthly'?0:1);
+  const dom=per==='monthly'?d:0, domOpts=[0];
+  for(let i=1;i<=28;i++) domOpts.push(i);
   return '<span class="soWk"'+(per==='monthly'?' style="display:none"':'')+'><select class="rDow">'+
       ISODOW.map(function(n,i){ return '<option value="'+(i+1)+'" '+(d===i+1?'selected':'')+'>'+n+'</option>'; }).join('')+'</select></span>'+
-    '<span class="soMo"'+(per==='monthly'?'':' style="display:none"')+'>day <input class="rate rDom" style="width:52px" value="'+(per==='monthly'?d:25)+'"></span>';
+    '<span class="soMo"'+(per==='monthly'?'':' style="display:none"')+'><select class="rDom">'+
+      domOpts.map(function(n){ return '<option value="'+n+'" '+(dom===n?'selected':'')+'>'+(n?'day '+n:'Last working day')+'</option>'; }).join('')+'</select></span>';
 }
 function sendOnDays(tr){
   const per=tr.querySelector('.rPer').value;
   if(per==='daily') return [1,2,3,4,5];
-  if(per==='monthly'){ const n=Math.min(28,Math.max(1,parseInt(tr.querySelector('.rDom').value,10)||25)); return [n]; }
+  if(per==='monthly'){ const n=parseInt(tr.querySelector('.rDom').value,10); return [(n>=0&&n<=28)?n:0]; }
   return [parseInt(tr.querySelector('.rDow').value,10)||1];
 }
 function admRules(b){
@@ -3200,13 +3203,13 @@ function admRules(b){
   const keep={};   // rows with unsaved changes: put them back after the list is rebuilt
   b.querySelectorAll('tbody tr[data-r]').forEach(function(tr){ if(tr.querySelector('.sv2.dirty')) keep[tr.dataset.r]=rv(tr); });
   b.innerHTML='<div class="caveat"><b>Mail is live.</b> A tick runs every morning at 09:00 Hong Kong time and sends the rules that are due that day: '+
-   'weekly rules on their weekday, monthly rules on their day of the month. Each person gets one mail per rule per period. '+
+   'weekly rules on their weekday, monthly rules on their day of the month or on the last working day (the last Mon–Fri; public holidays still count as working days). Each person gets one mail per rule per period. '+
    'Use <b>Test</b> to see exactly who a rule would notify right now, without sending anything.</div>'+
    '<div class="tblwrap"><table class="adm"><thead><tr><th>State</th><th>Condition</th><th class="n">Threshold</th>'+
    '<th>Period</th><th>Send on</th><th>Applies to</th><th>Notify</th><th></th></tr></thead><tbody>'+
    RULES.map(row).join('')+row(null)+'</tbody></table></div>'+
    '<div id="dryOut"></div>'+
-   '<p class="note">Weekly looks at last week, monthly at this month so far \u2014 so a monthly rule set to the 25th is the month-end chase, sent while there is still time to fill the gaps. '+
+   '<p class="note">Weekly looks at last week, monthly at this month so far \u2014 so a monthly rule set to the last working day is the month-end chase, sent before the month closes. '+
    'Applies to narrows the rule to one group (Groups tab); Everyone tracking means every active person expected to log time. '+
    'On the 2026 evidence a daily rule would fire at almost everyone, so weekly or monthly is the sensible default.</p>';
   b.querySelectorAll('tbody tr').forEach(function(tr){
